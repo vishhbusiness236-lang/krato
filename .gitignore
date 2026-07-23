@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+analysis-report.md
+scan-report.json
+scan-screenshot.png
+login-scan-screenshot.png
+login-before-submit.png
+login-after-submit.png
+
+analysis-report.md
+scan-report.json
+scan-screenshot.png
+login-scan-screenshot.png
+login-before-submit.png
+login-after-submit.png
