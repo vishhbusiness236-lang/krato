@@ -86,14 +86,7 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="text-center mb-10">
-          <button
-            onClick={() => setUrl('https://findteamo.vercel.app')}
-            className="text-xs text-gray-500 hover:text-black underline"
-          >
-            Try it on: findteamo.vercel.app
-          </button>
-        </div>
+      
 
         <div className="flex justify-center gap-8 mb-10 text-sm text-gray-600">
           <div className="flex items-center gap-2">
@@ -117,9 +110,9 @@ export default function Home() {
         )}
 
         {loading && (
-          <div className="flex flex-col items-center justify-center py-10 gap-3">
-            <div className="w-6 h-6 border-2 border-gray-300 border-t-black rounded-full animate-spin"></div>
-            <p className="text-gray-500 text-sm">Running Krato on your app — this can take 20-30 seconds...</p>
+          <div className="flex flex-col items-center justify-center py-14 gap-4">
+            <div className="w-12 h-12 border-[3px] border-gray-200 border-t-black rounded-full animate-spin"></div>
+            <p className="text-gray-600 text-sm font-medium">Scanning...</p>
           </div>
         )}
 
