@@ -57,7 +57,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <div className="max-w-3xl mx-auto px-6 py-16">
-       {/* Header */}
+        {/* Header */}
         <div className="mb-10 text-center flex flex-col items-center">
           <img src="/logo.png" alt="Krato logo" className="w-16 h-16 rounded-2xl mb-3" />
           <h1 className="text-3xl font-bold tracking-tight">Krato</h1>
@@ -66,8 +66,8 @@ export default function Home() {
           </p>
         </div>
 
-       {/* Input */}
-        <div className="flex gap-2 mb-10">
+        {/* Input */}
+        <div className="flex gap-2 mb-3">
           <input
             type="text"
             value={url}
@@ -83,6 +83,15 @@ export default function Home() {
             className="bg-black text-white px-6 py-3 rounded-lg text-sm font-medium disabled:opacity-50"
           >
             {loading ? 'Scanning...' : 'Scan'}
+          </button>
+        </div>
+
+        <div className="text-center mb-10">
+          <button
+            onClick={() => setUrl('https://findteamo.vercel.app')}
+            className="text-xs text-gray-500 hover:text-black underline"
+          >
+            Try it on: findteamo.vercel.app
           </button>
         </div>
 
@@ -108,8 +117,9 @@ export default function Home() {
         )}
 
         {loading && (
-          <div className="text-center text-gray-500 text-sm py-10">
-            Running Krato on your app — this can take 20-30 seconds...
+          <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <div className="w-6 h-6 border-2 border-gray-300 border-t-black rounded-full animate-spin"></div>
+            <p className="text-gray-500 text-sm">Running Krato on your app — this can take 20-30 seconds...</p>
           </div>
         )}
 
