@@ -57,8 +57,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <div className="max-w-3xl mx-auto px-6 py-16">
-        {/* Header */}
-        <div className="mb-10 text-center">
+       {/* Header */}
+        <div className="mb-10 text-center flex flex-col items-center">
+          <img src="/logo.png" alt="Krato logo" className="w-16 h-16 rounded-2xl mb-3" />
           <h1 className="text-3xl font-bold tracking-tight">Krato</h1>
           <p className="text-gray-500 mt-2">
             AI agent that tests your app and finds what's broken.
