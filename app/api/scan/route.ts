@@ -1,10 +1,26 @@
 // app/api/scan/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { chromium } from 'playwright';
+import chromium from '@sparticuz/chromium';
+import { chromium as playwrightChromium } from 'playwright-core';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+async function getBrowser() {
+  try {
+    // Always try the serverless-compatible Chromium first
+    const executablePath = await chromium.executablePath();
+    return await playwrightChromium.launch({
+      args: chromium.args,
+      executablePath,
+      headless: true,
+    });
+  } catch (err) {
+    // Fallback for local dev where sparticuz chromium may not resolve
+    return await playwrightChromium.launch({ headless: true });
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,12 +30,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
-    // Auto-add https:// if missing
     if (!/^https?:\/\//i.test(url)) {
       url = `https://${url}`;
     }
 
-    const browser = await chromium.launch({ headless: true });
+    const browser = await getBrowser();
     const context = await browser.newContext();
     const page = await context.newPage();
 
@@ -36,10 +51,7 @@ export async function POST(req: NextRequest) {
       }
     });
     page.on('requestfailed', (request) => {
-      networkErrors.push({
-        url: request.url(),
-        status: 'FAILED',
-      });
+      networkErrors.push({ url: request.url(), status: 'FAILED' });
     });
 
     try {
