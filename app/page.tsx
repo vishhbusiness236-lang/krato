@@ -65,13 +65,14 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Input */}
-       <div className="flex gap-2 mb-10">
+       {/* Input */}
+        <div className="flex gap-2 mb-10">
           <input
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://your-app.com"
+            suppressHydrationWarning
             className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black"
           />
           <button
