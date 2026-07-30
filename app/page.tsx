@@ -4,7 +4,21 @@
 
 import { useState } from 'react';
 
+interface Issue {
+  type: string;
+  description: string;
+  severity: 'critical' | 'medium' | 'low';
+  location?: string;
+}
+
+interface Analysis {
+  summary: string;
+  priorityFix: string;
+  issues: Issue[];
+}
+
 interface ScanResult {
+  scanId?: string;
   scanData: {
     url: string;
     buttons: string[];
@@ -14,15 +28,33 @@ interface ScanResult {
     consoleErrors: string[];
     networkErrors: { url: string; status: number | string }[];
   };
-  analysis: string;
+  analysis: Analysis;
   screenshot: string;
 }
+
+interface HistoryItem {
+  id: string;
+  url: string;
+  created_at: string;
+}
+
+const severityStyles: Record<string, string> = {
+  critical: 'bg-red-100 text-red-700 border-red-200',
+  medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  low: 'bg-blue-100 text-blue-700 border-blue-200',
+};
+
+const severityOrder: Record<string, number> = { critical: 0, medium: 1, low: 2 };
 
 export default function Home() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   async function handleScan() {
     if (!url) return;
@@ -50,21 +82,119 @@ export default function Home() {
     }
   }
 
-  const totalIssues =
-    (result?.scanData.consoleErrors.length || 0) +
-    (result?.scanData.networkErrors.length || 0);
+  async function downloadPDF() {
+    if (!result) return;
+    setDownloading(true);
+    try {
+      const res = await fetch('/api/reports/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: result.scanData.url,
+          analysis: result.analysis,
+          scanData: result.scanData,
+        }),
+      });
+      if (!res.ok) throw new Error('PDF generation failed');
+      const blob = await res.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'krato-report.pdf';
+      link.click();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function loadHistory() {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch('/api/history');
+      const data = await res.json();
+      setHistory(data.scans || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  function toggleHistory() {
+    const opening = !historyOpen;
+    setHistoryOpen(opening);
+    if (opening) loadHistory();
+  }
+
+  async function loadPastScan(id: string) {
+    setLoading(true);
+    setError('');
+    setHistoryOpen(false);
+    try {
+      const res = await fetch(`/api/history/${id}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to load scan');
+      } else {
+        setResult(data);
+        setUrl(data.scanData.url);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load scan');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const issues = result?.analysis?.issues || [];
+  const sortedIssues = [...issues].sort(
+    (a, b) => severityOrder[a.severity] - severityOrder[b.severity]
+  );
+  const criticalCount = issues.filter((i) => i.severity === 'critical').length;
+  const totalIssues = issues.length;
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <div className="max-w-3xl mx-auto px-6 py-16">
         {/* Header */}
-        <div className="mb-10 text-center flex flex-col items-center">
+        <div className="mb-10 text-center flex flex-col items-center relative">
+          <button
+            onClick={toggleHistory}
+            className="absolute right-0 top-0 text-xs font-medium px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+          >
+            History
+          </button>
           <img src="/logo.png" alt="Krato logo" className="w-16 h-16 rounded-2xl mb-3" />
           <h1 className="text-3xl font-bold tracking-tight">Krato</h1>
           <p className="text-gray-500 mt-2">
             AI agent that tests your app and finds what's broken.
           </p>
         </div>
+
+        {/* History panel */}
+        {historyOpen && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 max-h-72 overflow-y-auto">
+            <h2 className="font-semibold mb-3 text-sm">Past Scans</h2>
+            {historyLoading && <p className="text-sm text-gray-500">Loading...</p>}
+            {!historyLoading && history.length === 0 && (
+              <p className="text-sm text-gray-500">No scans yet.</p>
+            )}
+            {!historyLoading &&
+              history.map((h) => (
+                <button
+                  key={h.id}
+                  onClick={() => loadPastScan(h.id)}
+                  className="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-50 text-sm"
+                >
+                  <span className="truncate">{h.url}</span>
+                  <span className="text-gray-400 text-xs ml-2 whitespace-nowrap">
+                    {new Date(h.created_at).toLocaleDateString()}
+                  </span>
+                </button>
+              ))}
+          </div>
+        )}
 
         {/* Input */}
         <div className="flex gap-2 mb-3">
@@ -85,8 +215,6 @@ export default function Home() {
             {loading ? 'Scanning...' : 'Scan'}
           </button>
         </div>
-
-      
 
         <div className="flex justify-center gap-8 mb-10 text-sm text-gray-600">
           <div className="flex items-center gap-2">
@@ -123,15 +251,26 @@ export default function Home() {
             <div className="bg-white border border-gray-200 rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold">Scan Summary</h2>
-                <span
-                  className={`text-xs font-medium px-3 py-1 rounded-full ${
-                    totalIssues > 0
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-green-100 text-green-700'
-                  }`}
-                >
-                  {totalIssues > 0 ? `${totalIssues} issues found` : 'No issues found'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={downloadPDF}
+                    disabled={downloading}
+                    className="text-sm font-medium px-5 py-2.5 rounded-lg bg-gray-900 text-white hover:bg-gray-700 active:scale-95 transition-all shadow-sm disabled:opacity-50 disabled:active:scale-100"
+                  >
+                    {downloading ? 'Generating...' : 'Download PDF'}
+                  </button>
+                  <span
+                    className={`text-xs font-medium px-3 py-1 rounded-full ${
+                      criticalCount > 0
+                        ? 'bg-red-100 text-red-700'
+                        : totalIssues > 0
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-green-100 text-green-700'
+                    }`}
+                  >
+                    {totalIssues > 0 ? `${totalIssues} issues found` : 'No issues found'}
+                  </span>
+                </div>
               </div>
               <div className="grid grid-cols-4 gap-4 text-center text-sm">
                 <div>
@@ -153,31 +292,43 @@ export default function Home() {
               </div>
             </div>
 
-            {/* AI Analysis */}
+            {/* AI Summary */}
             <div className="bg-white border border-gray-200 rounded-xl p-6">
               <h2 className="font-semibold mb-3">AI Analysis</h2>
-              <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans leading-relaxed">
-                {result.analysis}
-              </pre>
+              <p className="text-sm text-gray-700 leading-relaxed mb-3">
+                {result.analysis?.summary}
+              </p>
+              {result.analysis?.priorityFix && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm">
+                  <span className="font-medium">Fix this first: </span>
+                  {result.analysis.priorityFix}
+                </div>
+              )}
             </div>
 
-            {/* Errors */}
-            {(result.scanData.consoleErrors.length > 0 ||
-              result.scanData.networkErrors.length > 0) && (
+            {/* Issues by severity */}
+            {sortedIssues.length > 0 && (
               <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <h2 className="font-semibold mb-3">Errors Detected</h2>
-                <ul className="space-y-2 text-sm">
-                  {result.scanData.consoleErrors.map((e, i) => (
-                    <li key={`c-${i}`} className="text-red-600">
-                      • {e}
-                    </li>
+                <h2 className="font-semibold mb-3">Issues</h2>
+                <div className="space-y-2">
+                  {sortedIssues.map((issue, i) => (
+                    <div
+                      key={i}
+                      className={`border rounded-lg p-3 text-sm ${severityStyles[issue.severity] || 'bg-gray-50 border-gray-200 text-gray-700'}`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium">{issue.type}</span>
+                        <span className="text-xs uppercase font-semibold tracking-wide">
+                          {issue.severity}
+                        </span>
+                      </div>
+                      <p className="text-sm opacity-90">{issue.description}</p>
+                      {issue.location && (
+                        <p className="text-xs opacity-70 mt-1">Location: {issue.location}</p>
+                      )}
+                    </div>
                   ))}
-                  {result.scanData.networkErrors.map((e, i) => (
-                    <li key={`n-${i}`} className="text-red-600">
-                      • [{e.status}] {e.url}
-                    </li>
-                  ))}
-                </ul>
+                </div>
               </div>
             )}
 

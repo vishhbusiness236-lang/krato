@@ -3,13 +3,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import chromium from '@sparticuz/chromium';
 import { chromium as playwrightChromium } from 'playwright-core';
+import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 async function getBrowser() {
   try {
-    // Always try the serverless-compatible Chromium first
     const executablePath = await chromium.executablePath();
     return await playwrightChromium.launch({
       args: chromium.args,
@@ -17,9 +17,21 @@ async function getBrowser() {
       headless: true,
     });
   } catch (err) {
-    // Fallback for local dev where sparticuz chromium may not resolve
     return await playwrightChromium.launch({ headless: true });
   }
+}
+
+interface Issue {
+  type: string;
+  description: string;
+  severity: 'critical' | 'medium' | 'low';
+  location?: string;
+}
+
+interface AnalysisResult {
+  summary: string;
+  priorityFix: string;
+  issues: Issue[];
 }
 
 export async function POST(req: NextRequest) {
@@ -101,13 +113,28 @@ Inputs found: ${scanData.inputsCount}
 Console errors: ${JSON.stringify(scanData.consoleErrors)}
 Network errors: ${JSON.stringify(scanData.networkErrors)}
 
-Based on this data:
-1. Explain in clear, professional English what issues might exist on this page
-2. If there are console/network errors, explain them in plain language (why they might have occurred)
-3. If very few buttons/forms were found, note that content may be loading dynamically via JS
-4. Give a short priority list: "fix this first"
+Analyze this data and respond with ONLY valid JSON in this exact structure, nothing else:
 
-Give only an actionable, concise report. No fluff.
+{
+  "summary": "2-3 sentence plain-English overview of the page's health",
+  "priorityFix": "1-2 sentences on what to fix first and why",
+  "issues": [
+    {
+      "type": "short issue name, e.g. 'Console Error' or 'Failed Network Request' or 'No Interactive Elements'",
+      "description": "plain-English explanation of the issue and likely cause",
+      "severity": "critical" | "medium" | "low",
+      "location": "optional: relevant URL, selector, or file if known"
+    }
+  ]
+}
+
+Severity rules:
+- "critical": breaks core functionality (failed page load, broken forms/auth, JS crash preventing interaction)
+- "medium": degrades experience but page still usable (some failed requests, non-fatal console errors)
+- "low": cosmetic or minor (missing alt text patterns, very few interactive elements found, minor warnings)
+
+If there are no console/network errors and buttons/forms/inputs seem reasonable, return an empty issues array and a positive summary.
+Do not include markdown formatting, code fences, or any text outside the JSON object.
 `;
 
     const groqResponse = await fetch(
@@ -122,15 +149,46 @@ Give only an actionable, concise report. No fluff.
           model: 'llama-3.3-70b-versatile',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.3,
+          response_format: { type: 'json_object' },
         }),
       }
     );
 
     const groqData = await groqResponse.json();
-    const analysis =
-      groqData.choices?.[0]?.message?.content || 'Analysis unavailable.';
+    const rawContent = groqData.choices?.[0]?.message?.content;
+
+    let analysis: AnalysisResult;
+    try {
+      analysis = JSON.parse(rawContent);
+      if (!Array.isArray(analysis.issues)) analysis.issues = [];
+    } catch (err) {
+      analysis = {
+        summary: 'Analysis unavailable — could not parse AI response.',
+        priorityFix: '',
+        issues: [],
+      };
+    }
+
+    const supabase = await createClient();
+    const { data: savedScan, error: dbError } = await supabase
+      .from('scans')
+      .insert({
+        url,
+        scan_data: scanData,
+        analysis: JSON.stringify(analysis),
+        screenshot: `data:image/png;base64,${screenshotBase64}`,
+      })
+      .select('id')
+      .single();
+
+    if (dbError) {
+      console.error('Failed to save scan — FULL ERROR:', JSON.stringify(dbError, null, 2));
+    } else {
+      console.log('Scan saved successfully, id:', savedScan?.id);
+    }
 
     return NextResponse.json({
+      scanId: savedScan?.id,
       scanData,
       analysis,
       screenshot: `data:image/png;base64,${screenshotBase64}`,
