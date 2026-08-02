@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Issue {
   type: string;
@@ -55,6 +55,16 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [origin, setOrigin] = useState('');
+  const [badgeOpen, setBadgeOpen] = useState(false);
+  const [copied, setCopied] = useState({ markdown: false, html: false });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin);
+    }
+  }, []);
 
   async function handleScan() {
     if (!url) return;
@@ -66,7 +76,7 @@ export default function Home() {
       const res = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, email: email || undefined })
       });
       const data = await res.json();
 
@@ -108,6 +118,22 @@ export default function Home() {
     }
   }
 
+  async function scheduleDailyScan() {
+    if (!url) return;
+    try {
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error('Failed to schedule');
+      alert('Daily scan scheduled for this URL!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to schedule scan.');
+    }
+  }
+
   async function loadHistory() {
     setHistoryLoading(true);
     try {
@@ -144,6 +170,18 @@ export default function Home() {
       setError(err.message || 'Failed to load scan');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function copyToClipboard(text: string, type: 'markdown' | 'html') {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied((prev) => ({ ...prev, [type]: true }));
+      window.setTimeout(() => {
+        setCopied((prev) => ({ ...prev, [type]: false }));
+      }, 1500);
+    } catch (err) {
+      console.error('Clipboard copy failed', err);
     }
   }
 
@@ -214,6 +252,27 @@ export default function Home() {
           >
             {loading ? 'Scanning...' : 'Scan'}
           </button>
+          <button
+            onClick={scheduleDailyScan}
+            disabled={!url}
+            className="border border-gray-300 text-gray-700 px-4 py-3 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+          >
+            Schedule Daily
+          </button>
+        </div>
+
+        {/* Email for report */}
+        <div className="mb-6">
+          <label className="block text-xs font-medium text-gray-500 mb-2">
+            Email for report (optional)
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+          />
         </div>
 
         <div className="flex justify-center gap-8 mb-10 text-sm text-gray-600">
@@ -259,6 +318,12 @@ export default function Home() {
                   >
                     {downloading ? 'Generating...' : 'Download PDF'}
                   </button>
+                  <button
+                    onClick={() => setBadgeOpen((open) => !open)}
+                    className="text-sm font-medium px-5 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:scale-95 transition-all shadow-sm disabled:opacity-50"
+                  >
+                    {badgeOpen ? 'Hide Badge' : 'Embed Badge'}
+                  </button>
                   <span
                     className={`text-xs font-medium px-3 py-1 rounded-full ${
                       criticalCount > 0
@@ -272,6 +337,65 @@ export default function Home() {
                   </span>
                 </div>
               </div>
+              {badgeOpen && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 text-sm">
+                  {result.scanId ? (
+                    <div className="space-y-4">
+                      <div className="text-sm font-semibold text-gray-900">Badge embed code</div>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-2">Markdown</p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={`[![Krato QA](${origin ? `${origin}/api/badge/${result.scanId}` : `/api/badge/${result.scanId}`})](${result.scanData.url})`}
+                              className="flex-1 border border-gray-300 rounded-lg bg-white px-4 py-3 text-xs text-gray-700"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                copyToClipboard(
+                                  `[![Krato QA](${origin ? `${origin}/api/badge/${result.scanId}` : `/api/badge/${result.scanId}`})](${result.scanData.url})`,
+                                  'markdown'
+                                )
+                              }
+                              className="px-3 py-2 rounded-lg bg-gray-900 text-white text-xs font-medium hover:bg-gray-700"
+                            >
+                              {copied.markdown ? 'Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-2">HTML</p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={`<a href="${result.scanData.url}"><img src="${origin ? `${origin}/api/badge/${result.scanId}` : `/api/badge/${result.scanId}`}" alt="Krato QA status" /></a>`}
+                              className="flex-1 border border-gray-300 rounded-lg bg-white px-4 py-3 text-xs text-gray-700"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                copyToClipboard(
+                                  `<a href="${result.scanData.url}"><img src="${origin ? `${origin}/api/badge/${result.scanId}` : `/api/badge/${result.scanId}`}" alt="Krato QA status" /></a>`,
+                                  'html'
+                                )
+                              }
+                              className="px-3 py-2 rounded-lg bg-gray-900 text-white text-xs font-medium hover:bg-gray-700"
+                            >
+                              {copied.html ? 'Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-600">Save this scan to enable badges.</div>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-4 gap-4 text-center text-sm">
                 <div>
                   <div className="text-xl font-bold">{result.scanData.buttons.length}</div>
