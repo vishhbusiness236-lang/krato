@@ -15,6 +15,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Krato — AI agent that tests your app",
   description: "Krato scans your live app like a real user, catches broken buttons, forms, and errors, and explains issues in plain English using AI.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/krato-favicon-32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: [{ url: "/krato-favicon-192.png", type: "image/png", sizes: "192x192" }],
+  },
 };
 
 export default function RootLayout({

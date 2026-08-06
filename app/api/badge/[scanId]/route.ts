@@ -28,9 +28,9 @@ function buildBadgeSvg(text: string, color: string) {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { scanId: string } }
+  { params }: { params: Promise<{ scanId: string }> }
 ) {
-  const scanId = params.scanId;
+  const { scanId } = await params;
   try {
     const supabase = await createClient();
     const { data, error } = await supabase

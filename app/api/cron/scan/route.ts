@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { runScan } from '@/lib/scan';
 import { notifyWebhook } from '@/lib/webhook/notify';
 
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: dueScans, error: fetchError } = await supabase
     .from('scheduled_scans')
@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
         scan_data: scanData,
         analysis: JSON.stringify(analysis),
         screenshot: `data:image/png;base64,${screenshotBase64}`,
+        user_id: scheduled.user_id ?? null,
       });
 
       const { data: webhookList, error: webhookError } = await supabase

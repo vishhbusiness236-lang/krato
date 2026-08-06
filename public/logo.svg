@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Krato">
+  <defs>
+    <clipPath id="rounded-square">
+      <rect x="24" y="24" width="464" height="464" rx="120" ry="120" />
+    </clipPath>
+  </defs>
+  <rect width="512" height="512" fill="#00000000" />
+  <image href="/logo.png" width="512" height="512" preserveAspectRatio="xMidYMid meet" clip-path="url(#rounded-square)" />
+</svg>

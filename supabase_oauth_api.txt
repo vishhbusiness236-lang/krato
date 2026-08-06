@@ -1,0 +1,755 @@
+﻿
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:122:  
+AuthOAuthAuthorizationDetailsResponse,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:123:  
+AuthOAuthConsentResponse,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:124:  
+AuthOAuthGrantsResponse,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:125:  
+AuthOAuthRevokeGrantResponse,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:126:  Prettify,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:127:  Provider,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:128:  ResendParams,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:129:  Session,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:130:  
+SignInAnonymouslyCredentials,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:131:  
+SignInWithIdTokenCredentials,
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:132:  
+SignInWithOAuthCredentials,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:133:  
+SignInWithPasswordCredentials,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:134:  
+SignInWithPasswordlessCredentials,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:135:  SignInWithSSO,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:136:  SignOut,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:137:  
+SignUpWithPasswordCredentials,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:138:  SolanaWallet,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:139:  
+SolanaWeb3Credentials,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:140:  SSOResponse,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:141:  StrictOmit,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:142:  Subscription,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:601:   * `initialize()` 
+returns the resolved session result (or any error encountered
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:602:   * while detecting 
+it from the URL).
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:603:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:604:   * @category Auth
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:605:   */
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:606:  async initialize(): 
+Promise<InitializeResult> {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:607:    if 
+(this.initializePromise) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:608:      return await 
+this.initializePromise
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:609:    }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:610:
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:611:    // Open the 
+notification queue before _initialize() runs so that every
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:612:    // 
+_notifyAllSubscribers call inside the init chain enqueues instead of
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:613:    // firing. 
+Without this, a callback receiving SIGNED_IN (or TOKEN_REFRESHED
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:614:    // / SIGNED_OUT) 
+during _recoverAndRefresh would deadlock if it called
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:615:    // getSession() / 
+getUser() — those methods await initializePromise, which
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:616:    // can only 
+resolve after the callback returns, which can only return after
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:617:    // getSession() 
+resolves. The queue is flushed below after initializePromise
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:618:    // has settled, 
+so callbacks run with a fully resolved initializePromise.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:619:    
+this._pendingInitNotifications = []
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:620:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:621:    
+this.initializePromise = (async () => {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:622:      if (this.lock 
+!= null) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:623:        // TODO(v3): 
+remove legacy lock path
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:624:        return await 
+this._acquireLock(this.lockAcquireTimeout, async () => {
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:625:          return 
+await this._initialize()
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:626:        })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:627:      }
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:628:      return await 
+this._initialize()
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:629:    })()
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:630:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:631:    const result = 
+await this.initializePromise
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:632:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:633:    // 
+initializePromise is now resolved — flush queued notifications in order.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:634:    // Callbacks can 
+safely call getSession() / getUser() / signOut() etc.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:635:    const queue = 
+this._pendingInitNotifications ?? []
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:636:    
+this._pendingInitNotifications = null
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:637:    for (const n of 
+queue) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:638:      await 
+this._notifyAllSubscribers(n.event, n.session, n.broadcast)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:640:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:641:    return result
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:642:  }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:643:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:644:  /**
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:645:   * IMPORTANT:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:646:   * 1. Never throw 
+in this method, as it is called from the constructor
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:647:   * 2. Never return 
+a session from this method as it would be cached over
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:648:   *    the whole 
+lifetime of the client
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:649:   */
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:650:  private async 
+_initialize(): Promise<InitializeResult> {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:651:    try {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:652:      let params: { 
+[parameter: string]: string } = {}
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:653:      let 
+callbackUrlType = 'none'
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:654:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:655:      if 
+(isBrowser()) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:656:        params = 
+parseParametersFromURL(window.location.href)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:657:        if 
+(this._isImplicitGrantCallback(params)) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:658:          
+callbackUrlType = 'implicit'
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:659:        } else if 
+(await this._isPKCECallback(params)) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:660:          
+callbackUrlType = 'pkce'
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:661:        }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:662:      }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:663:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:664:      /**
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:665:       * Attempt to 
+get the session from the URL only if these conditions are fulfilled
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:666:       *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:667:       * Note: If the 
+URL isn't one of the callback url types (implicit or pkce),
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:668:       * then there 
+could be an existing session so we don't want to prematurely remove it
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:669:       */
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:670:      if (isBrowser() 
+&& this.detectSessionInUrl && callbackUrlType !== 'none') {
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:671:        const { data, 
+error } = await this._getSessionFromURL(params, callbackUrlType)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:672:        if (error) {
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:673:          
+this._debug('#_initialize()', 'error detecting session from URL', error)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:674:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:675:          if 
+(isAuthImplicitGrantRedirectError(error)) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:676:            const 
+errorCode = error.details?.code
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:677:            if (
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:678:              
+errorCode === 'identity_already_exists' ||
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:679:              
+errorCode === 'identity_not_found' ||
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:680:              
+errorCode === 'single_identity_not_deletable'
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:681:            ) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:682:              return 
+{ error }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:683:            }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:685:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:686:          // Don't 
+remove existing session on URL login failure.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:687:          // A failed 
+attempt (e.g. reused magic link) shouldn't invalidate a valid session.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:688:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:689:          return { 
+error }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:690:        }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:691:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:692:        const { 
+session, redirectType } = data
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:693:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:694:        this._debug(
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:695:          
+'#_initialize()',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:696:          'detected 
+session in URL',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:697:          session,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:698:          'redirect 
+type',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:699:          redirectType
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:700:        )
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:701:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:702:        await 
+this._saveSession(session)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:703:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:704:        
+setTimeout(async () => {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:705:          if 
+(redirectType === 'recovery') {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:717:    } catch (error) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:718:      if 
+(isAuthError(error)) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:719:        return 
+this._returnResult({ error })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:720:      }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:721:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:722:      return 
+this._returnResult({
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:723:        error: new 
+AuthUnknownError('Unexpected error during initialization', error),
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:724:      })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:725:    } finally {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:726:      await 
+this._handleVisibilityChange()
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:727:      
+this._debug('#_initialize()', 'end')
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:728:    }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:729:  }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:730:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:731:  /**
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:732:   * Creates a new 
+anonymous user.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:733:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:734:   * @returns A 
+session where the is_anonymous claim in the access token JWT set to true
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:735:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:736:   * @category Auth
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:737:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1277:   * This method 
+supports the PKCE flow.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1278:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1279:   * @category Auth
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1280:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1281:   * @remarks
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1282:   * - This method 
+is used for signing in using [Social Login (OAuth) 
+providers](/docs/guides/auth#configure-third-party-providers).
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1283:   * - It works by 
+redirecting your application to the provider's authorization screen, before 
+bringing back the user to your app.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1284:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1285:   * @example Sign 
+in using a third-party provider
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1286:   * ```js
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1287:   * const { data, 
+error } = await supabase.auth.signInWithOAuth({
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1288:   *   provider: 
+'github'
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1289:   * })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1290:   * ```
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1291:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1292:   * 
+@exampleResponse Sign in using a third-party provider
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1293:   * ```json
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1294:   * {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1295:   *   data: {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1296:   *     provider: 
+'github',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1297:   *     url: 
+<PROVIDER_URL_TO_REDIRECT_TO>,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1300:   *   error: null
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1301:   * }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1302:   * ```
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1303:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1304:   * 
+@exampleDescription Sign in using a third-party provider with redirect
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1305:   * - When the 
+OAuth provider successfully authenticates the user, they are redirected to the 
+URL specified in the `redirectTo` parameter. This parameter defaults to the 
+[`SITE_URL`](/docs/guides/auth/redirect-urls#use-wildcards-in-redirect-urls). 
+It does not redirect the user immediately after invoking this method.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1306:   * - See [redirect 
+URLs and 
+wildcards](/docs/guides/auth/redirect-urls#use-wildcards-in-redirect-urls) to 
+add additional redirect URLs to your project.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1307:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1308:   * @example Sign 
+in using a third-party provider with redirect
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1309:   * ```js
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1310:   * const { data, 
+error } = await supabase.auth.signInWithOAuth({
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1311:   *   provider: 
+'github',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1312:   *   options: {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1313:   *     redirectTo: 
+'https://example.com/welcome'
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1314:   *   }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1315:   * })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1316:   * ```
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1317:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1318:   * 
+@exampleDescription Sign in with scopes and access provider tokens
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1319:   * If you need 
+additional access from an OAuth provider, in order to access provider specific 
+APIs in the name of the user, you can do this by passing in the scopes the 
+user should authorize for your application. Note that the `scopes` option 
+takes in **a space-separated list** of scopes.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1320:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1321:   * Because OAuth 
+sign-in often includes redirects, you should register an `onAuthStateChange` 
+callback immediately after you create the Supabase client. This callback will 
+listen for the presence of `provider_token` and `provider_refresh_token` 
+properties on the `session` object and store them in local storage. The client 
+library will emit these values **only once** immediately after the user signs 
+in. You can then access them by looking them up in local storage, or send them 
+to your backend servers for further processing.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1322:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1323:   * Finally, make 
+sure you remove them from local storage on the `SIGNED_OUT` event. If the 
+OAuth provider supports token revocation, make sure you call those APIs either 
+from the frontend or schedule them to be called on the backend.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1324:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1325:   * @example Sign 
+in with scopes and access provider tokens
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1326:   * ```js
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1327:   * // Register 
+this immediately after calling createClient!
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1328:   * // Because 
+signInWithOAuth causes a redirect, you need to fetch the
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1329:   * // provider 
+tokens from the callback.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1330:   * 
+supabase.auth.onAuthStateChange((event, session) => {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1331:   *   if (session 
+&& session.provider_token) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1332:   *     
+window.localStorage.setItem('oauth_provider_token', session.provider_token)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1333:   *   }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1334:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1335:   *   if (session 
+&& session.provider_refresh_token) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1336:   *     
+window.localStorage.setItem('oauth_provider_refresh_token', 
+session.provider_refresh_token)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1337:   *   }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1338:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1339:   *   if (event === 
+'SIGNED_OUT') {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1340:   *     
+window.localStorage.removeItem('oauth_provider_token')
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1341:   *     
+window.localStorage.removeItem('oauth_provider_refresh_token')
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1342:   *   }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1343:   * })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1344:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1345:   * // Call this on 
+your Sign in with GitHub button to initiate OAuth
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1346:   * // with GitHub 
+with the requested elevated scopes.
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1347:   * await 
+supabase.auth.signInWithOAuth({
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1348:   *   provider: 
+'github',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1349:   *   options: {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1350:   *     scopes: 
+'repo gist notifications'
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1351:   *   }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1352:   * })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1353:   * ```
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1354:   */
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1355:  async 
+signInWithOAuth(credentials: SignInWithOAuthCredentials): 
+Promise<OAuthResponse> {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1356:    return await 
+this._handleProviderSignIn(credentials.provider, {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1357:      redirectTo: 
+credentials.options?.redirectTo,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1358:      scopes: 
+credentials.options?.scopes,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1359:      queryParams: 
+credentials.options?.queryParams,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1360:      
+skipBrowserRedirect: credentials.options?.skipBrowserRedirect,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1361:    })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1362:  }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1363:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1364:  /**
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1365:   * Log in an 
+existing user by exchanging an Auth Code issued during the PKCE flow.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1366:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1367:   * @category Auth
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1368:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1369:   * @remarks
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1370:   * - Used when 
+`flowType` is set to `pkce` in client options.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1371:   * - When several 
+PKCE flows are in flight at once, pass `options.flowId` so
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1372:   *   the code is 
+exchanged with the verifier created by that specific flow.
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1373:   *   The flow id 
+is returned by `signInWithOAuth`, and with
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1374:   *   
+`experimental.appendPkceFlowIdToRedirects` enabled it also arrives on
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1375:   *   your callback 
+URL as the reserved `sb_flow_id` query parameter (read
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1376:   *   automatically 
+in a browser).
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1377:   * - When a flow 
+id is present but its stored verifier is gone (evicted,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1378:   *   already used, 
+or from another device), the call fails with a verifier
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1379:   *   missing error 
+instead of trying another flow's verifier — a mismatched
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1380:   *   verifier 
+would consume the single-use code. Without any flow id the
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1381:   *   most recently 
+stored verifier is used, as before.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1382:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1383:   * @example 
+Exchange Auth Code
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1384:   * ```js
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1385:   * 
+supabase.auth.exchangeCodeForSession('34e770dd-9ff9-416c-87fa-43b31d7ef225')
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1386:   * ```
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1387:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1388:   * @example 
+Exchange Auth Code for a specific flow (e.g. in a server-side callback handler)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1389:   * ```js
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1390:   * const flowId = 
+requestUrl.searchParams.get('sb_flow_id')
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1391:   * 
+supabase.auth.exchangeCodeForSession(code, flowId ? { flowId } : undefined)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1392:   * ```
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1393:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1394:   * 
+@exampleResponse Exchange Auth Code
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1395:   * ```json
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1396:   * {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1397:   *   "data": {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1398:   *     session: {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1399:   *       
+access_token: '<ACCESS_TOKEN>',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1400:   *       
+token_type: 'bearer',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1401:   *       
+expires_in: 3600,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1541:   *       
+created_at: '2024-01-01T00:00:00Z',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1542:   *       
+updated_at: '2024-01-01T00:00:00Z',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1543:   *       
+is_anonymous: false
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1544:   *     },
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1545:   *     
+redirectType: null
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1546:   *   },
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1547:   *   "error": null
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1548:   * }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1549:   * ```
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1550:   */
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1551:  async 
+exchangeCodeForSession(
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1552:    authCode: string,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1553:    options?: { 
+flowId?: string }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1554:  ): 
+Promise<AuthTokenResponse> {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1555:    await 
+this.initializePromise
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1556:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1557:    if (this.lock != 
+null) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1558:      // TODO(v3): 
+remove legacy lock path
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1559:      return 
+this._acquireLock(this.lockAcquireTimeout, async () => {
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1560:        return 
+this._exchangeCodeForSession(authCode, options)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1561:      })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1562:    }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1563:
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1564:    return 
+this._exchangeCodeForSession(authCode, options)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1565:  }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1566:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1567:  /**
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1568:   * Signs in a user 
+by verifying a message signed by the user's private key.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1569:   * Supports 
+Ethereum (via Sign-In-With-Ethereum) & Solana (Sign-In-With-Solana) standards,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1570:   * both of which 
+derive from the EIP-4361 standard
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1571:   * With slight 
+variation on Solana's side.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1572:   * @reference 
+https://eips.ethereum.org/EIPS/eip-4361
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1573:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1574:   * @category Auth
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1987:      return 
+this._returnResult({ data: { ...data }, error })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1988:    } catch (error) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1989:      if 
+(isAuthError(error)) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1990:        return 
+this._returnResult({ data: { user: null, session: null }, error })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1991:      }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1992:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1993:      throw error
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1994:    }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1995:  }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1996:
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:1997:  private async 
+_exchangeCodeForSession(
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1998:    authCode: string,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:1999:    options?: { 
+flowId?: string }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2000:  ): Promise<
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2001:    | {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2002:        data: { 
+session: Session; user: User; redirectType: string | null }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2003:        error: null
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2004:      }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2005:    | { data: { 
+session: null; user: null; redirectType: null }; error: AuthError }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2006:  > {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2007:    const 
+hasExplicitFlowId = options?.flowId != null
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2008:    const 
+requestedFlowId = hasExplicitFlowId
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2009:      ? 
+validatePKCEFlowId(options?.flowId)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2010:      : isBrowser()
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2011:        ? validatePKC
+EFlowId(parseParametersFromURL(window.location.href)[PKCE_FLOW_ID_PARAM])
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2012:        : null
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2013:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2014:    if 
+(hasExplicitFlowId && !requestedFlowId) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2015:      this._debug(
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:2016:        
+'#_exchangeCodeForSession()',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2017:        'provided 
+flowId is not a valid flow id',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2018:        
+options?.flowId
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2019:      )
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2020:    }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2021:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2022:    // With a flow 
+id (explicit or from the callback URL) the lookup is
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2023:    // slot-only and 
+a miss fails fast — see retrievePKCEVerifier. An invalid
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2024:    // explicit flow 
+id also fails fast rather than borrowing another flow's
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2025:    // verifier.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:2026:    const { 
+verifier: storageItem, flowId } =
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3815:        return 
+this._returnResult({ data: { user: null, session: null }, error })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3816:      }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3817:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3818:      throw error
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3819:    }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3820:  }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3821:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3822:  /**
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3823:   * Gets the 
+session data from a URL string
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3824:   */
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:3825:  private async 
+_getSessionFromURL(
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3826:    params: { 
+[parameter: string]: string },
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3827:    callbackUrlType: 
+string
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3828:  ): Promise<
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3829:    | {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3830:        data: { 
+session: Session; redirectType: string | null }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3831:        error: null
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3832:      }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3833:    | { data: { 
+session: null; redirectType: null }; error: AuthError }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3834:  > {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3835:    try {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3859:          if 
+(this.flowType === 'implicit') {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3860:            throw 
+new AuthImplicitGrantRedirectError('Not a valid implicit grant flow url.')
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3861:          }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3862:          break
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3863:        default:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3864:        // there's 
+no mismatch so we continue
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3865:      }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3866:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3867:      // Since this 
+is a redirect for PKCE, we attempt to retrieve the code from the URL for the 
+code exchange
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3868:      if 
+(callbackUrlType === 'pkce') {
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:3869:        
+this._debug('#_initialize()', 'begin', 'is PKCE flow', true)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3870:        if 
+(!params.code) throw new AuthPKCEGrantCodeExchangeError('No code detected.')
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:3871:        const { 
+data, error } = await this._exchangeCodeForSession(params.code, {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3872:          flowId: 
+params[PKCE_FLOW_ID_PARAM],
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3873:        })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3874:        if (error) 
+throw error
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3875:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3876:        const url = 
+new URL(window.location.href)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3877:        
+url.searchParams.delete('code')
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3878:        
+url.searchParams.delete(PKCE_FLOW_ID_PARAM)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3879:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3880:        
+window.history.replaceState(window.history.state, '', url.toString())
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3881:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3940:        access_token,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3941:        expires_in: 
+expiresIn,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3942:        expires_at: 
+expiresAt,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3943:        
+refresh_token,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3944:        token_type: 
+token_type as 'bearer',
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3945:        user: 
+data.user,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3946:      }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3947:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3948:      // Remove 
+tokens from URL
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3949:      
+window.location.hash = ''
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:3950:      
+this._debug('#_getSessionFromURL()', 'clearing window.location.hash')
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3951:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3952:      return 
+this._returnResult({ data: { session, redirectType: params.type }, error: null 
+})
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3953:    } catch (error) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3954:      if 
+(isAuthError(error)) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3955:        return 
+this._returnResult({ data: { session: null, redirectType: null }, error })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3956:      }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3957:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3958:      throw error
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3959:    }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:3960:  }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4207:   * 
+@exampleDescription Store OAuth provider tokens on sign in
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4208:   * When using 
+[OAuth (Social Login)](/docs/guides/auth/social-login) you sometimes wish to 
+get access to the provider's access token and refresh token, in order to call 
+provider APIs in the name of the user.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4209:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4210:   * For example, if 
+you are using [Sign in with 
+Google](/docs/guides/auth/social-login/auth-google) you may want to use the 
+provider token to call Google APIs on behalf of the user. Supabase Auth does 
+not keep track of the provider access and refresh token, but does return them 
+for you once, immediately after sign in. You can use the `onAuthStateChange` 
+method to listen for the presence of the provider tokens and store them in 
+local storage. You can further send them to your server's APIs for use on the 
+backend.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4211:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4212:   * Finally, make 
+sure you remove them from local storage on the `SIGNED_OUT` event. If the 
+OAuth provider supports token revocation, make sure you call those APIs either 
+from the frontend or schedule them to be called on the backend.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4213:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4214:   * @example Store 
+OAuth provider tokens on sign in
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4215:   * ```js
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4216:   * // Register 
+this immediately after calling createClient!
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:4217:   * // Because 
+signInWithOAuth causes a redirect, you need to fetch the
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4218:   * // provider 
+tokens from the callback.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4219:   * 
+supabase.auth.onAuthStateChange((event, session) => {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4220:   *   if (session 
+&& session.provider_token) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4221:   *     
+window.localStorage.setItem('oauth_provider_token', session.provider_token)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4222:   *   }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4223:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4224:   *   if (session 
+&& session.provider_refresh_token) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4225:   *     
+window.localStorage.setItem('oauth_provider_refresh_token', 
+session.provider_refresh_token)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4226:   *   }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4227:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4534:        return 
+this._returnResult({ data: null, error })
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4535:      }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4536:      throw error
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4537:    }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4538:  }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4539:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4540:  /**
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4541:   * Links an oauth 
+identity to an existing user.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4542:   * This method 
+supports the PKCE flow.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4543:   */
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:4544:  async 
+linkIdentity(credentials: SignInWithOAuthCredentials): Promise<OAuthResponse>
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4545:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4546:  /**
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4547:   * Links an OIDC 
+identity to an existing user.
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4548:   */
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4549:  async 
+linkIdentity(credentials: SignInWithIdTokenCredentials): 
+Promise<AuthTokenResponse>
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4550:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4551:  /**  *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4552:   * @category Auth
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4553:   *
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4554:   * @remarks
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4577:   * ```
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4578:   */
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4579:  async 
+linkIdentity(credentials: any): Promise<any> {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4580:    if ('token' in 
+credentials) {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4581:      return 
+this.linkIdentityIdToken(credentials)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4582:    }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4583:
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4584:    return 
+this.linkIdentityOAuth(credentials)
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4585:  }
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4586:
+> node_modules\@supabase\auth-js\src\GoTrueClient.ts:4587:  private async 
+linkIdentityOAuth(credentials: SignInWithOAuthCredentials): 
+Promise<OAuthResponse> {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4588:    let flowId: 
+string | null = null
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4589:    try {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4590:      const { data, 
+error } = await this._useSession(async (result) => {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4591:        const { 
+data, error } = result
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4592:        if (error) 
+throw error
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4593:        const { url, 
+flowId: urlFlowId } = await this._getUrlForProvider(
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4594:          
+`${this.url}/user/identities/authorize`,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4595:          
+credentials.provider,
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4596:          {
+  node_modules\@supabase\auth-js\src\GoTrueClient.ts:4597:            
+redirectTo: credentials.options?.redirectTo,
+
+

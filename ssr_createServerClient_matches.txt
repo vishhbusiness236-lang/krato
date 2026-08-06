@@ -1,0 +1,26 @@
+﻿
+   *
+   * - A middleware client was not configured.
+   * - There is a bug in your middleware.
+>  * - You are calling `supabase.auth.updateUser()` server-side.
+   *
+   * Please consult the [Supabase SSR 
+guides](https://supabase.com/docs/guides/auth/server-side)
+   * for your framework.
+   * **Session initialization.**
+   *
+   * This client uses lazy session initialization (`skipAutoInitialize: true`).
+>  * The session is not loaded until the first call to `getSession()`,
+>  * `getUser()`, or `getClaims()` (which calls `getSession()` internally when
+   * no explicit JWT is passed). Token refreshes write the updated session back
+   * to cookies via the `setAll` handler.
+   *
+      },
+    });
+  
+>   client.auth.onAuthStateChange(async (event: AuthChangeEvent) => {
+      // The SIGNED_IN event is fired very often, but we don't need to
+      // apply the storage each time it fires, only if there are changes
+      // that need to be set -- which is if setItems / removeItems have
+
+
