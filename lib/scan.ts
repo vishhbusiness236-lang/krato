@@ -8,12 +8,24 @@ export interface Issue {
   description: string;
   severity: 'critical' | 'medium' | 'low';
   location?: string;
+  // NEW: actionable/triaged fields
+  endpoint?: string;
+  method?: string;
+  statusCode?: number | string;
+  reproSteps?: string[];
+  evidence?: string;
 }
 
 export interface AnalysisResult {
   summary: string;
   priorityFix: string;
   issues: Issue[];
+}
+
+interface NetworkErrorEntry {
+  url: string;
+  status: number | string;
+  method: string;
 }
 
 interface PageScan {
@@ -23,7 +35,7 @@ interface PageScan {
   formsCount: number;
   inputsCount: number;
   consoleErrors: string[];
-  networkErrors: { url: string; status: number | string }[];
+  networkErrors: NetworkErrorEntry[];
 }
 
 async function getBrowser() {
@@ -37,6 +49,56 @@ async function getBrowser() {
   } catch (err) {
     return await playwrightChromium.launch({ headless: true });
   }
+}
+
+// Turns raw network/console errors into guaranteed-accurate, actionable issues
+// (no AI involved here, so the endpoint/status/repro steps are always correct)
+function buildTriagedIssues(pageScans: PageScan[]): Issue[] {
+  const issues: Issue[] = [];
+
+  for (const page of pageScans) {
+    for (const err of page.networkErrors) {
+      let endpointPath = err.url;
+      try {
+        endpointPath = new URL(err.url).pathname;
+      } catch {}
+
+      const statusNum = typeof err.status === 'number' ? err.status : 0;
+      const severity: Issue['severity'] =
+        err.status === 'FAILED' || statusNum >= 500 ? 'critical' : 'medium';
+
+      issues.push({
+        type: statusNum >= 500 || err.status === 'FAILED' ? 'Network Failure' : 'Failed Request',
+        description:
+          err.status === 'FAILED'
+            ? `Request to ${endpointPath} failed to complete (network error or timeout).`
+            : `${err.method} ${endpointPath} returned ${err.status}.`,
+        severity,
+        location: page.url,
+        endpoint: endpointPath,
+        method: err.method,
+        statusCode: err.status,
+        reproSteps: [
+          `Visit ${page.url}`,
+          `Trigger the action that calls ${err.method} ${endpointPath}`,
+          `Observe response: ${err.status}`,
+        ],
+      });
+    }
+
+    for (const errText of page.consoleErrors) {
+      issues.push({
+        type: 'Console Error',
+        description: errText,
+        severity: 'medium',
+        location: page.url,
+        evidence: errText,
+        reproSteps: [`Visit ${page.url}`, 'Open browser DevTools console', 'Error appears on load or interaction'],
+      });
+    }
+  }
+
+  return issues;
 }
 
 export async function runScan(inputUrl: string) {
@@ -61,7 +123,7 @@ export async function runScan(inputUrl: string) {
 
     const page = await context.newPage();
     const consoleErrors: string[] = [];
-    const networkErrors: { url: string; status: number | string }[] = [];
+    const networkErrors: NetworkErrorEntry[] = [];
 
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
@@ -69,11 +131,19 @@ export async function runScan(inputUrl: string) {
     page.on('pageerror', (err) => consoleErrors.push(err.message));
     page.on('response', (res) => {
       if (res.status() >= 400) {
-        networkErrors.push({ url: res.url(), status: res.status() });
+        networkErrors.push({
+          url: res.url(),
+          status: res.status(),
+          method: res.request().method(),
+        });
       }
     });
     page.on('requestfailed', (request) => {
-      networkErrors.push({ url: request.url(), status: 'FAILED' });
+      networkErrors.push({
+        url: request.url(),
+        status: 'FAILED',
+        method: request.method(),
+      });
     });
 
     try {
@@ -147,6 +217,9 @@ export async function runScan(inputUrl: string) {
     networkErrors: pageScans.flatMap((p) => p.networkErrors),
   };
 
+  // Guaranteed-accurate issues built directly from raw data (no AI hallucination risk)
+  const triagedIssues = buildTriagedIssues(pageScans);
+
   const pageBreakdown = pageScans
     .map(
       (p) =>
@@ -163,14 +236,13 @@ Pages scanned: ${scanData.pagesScanned}
 Per-page breakdown:
 ${pageBreakdown}
 
-Total console errors across all pages: ${JSON.stringify(scanData.consoleErrors)}
-Total network errors across all pages: ${JSON.stringify(scanData.networkErrors)}
+Note: network and console errors are already reported separately with exact endpoints and status codes, so do NOT repeat them in your issues list. Only add issues that require judgment — e.g. suspiciously few buttons/forms/inputs for the page type, structural concerns, or UX red flags visible from the data.
 
-Analyze this data and respond with ONLY valid JSON in this exact structure, nothing else:
+Respond with ONLY valid JSON in this exact structure, nothing else:
 
 {
   "summary": "2-3 sentence plain-English overview of the site's health across the pages scanned",
-  "priorityFix": "1-2 sentences on what to fix first and why",
+  "priorityFix": "1-2 sentences on what to fix first and why, considering both the errors already found and anything you notice",
   "issues": [
     {
       "type": "short issue name",
@@ -181,12 +253,7 @@ Analyze this data and respond with ONLY valid JSON in this exact structure, noth
   ]
 }
 
-Severity rules:
-- "critical": breaks core functionality (failed page load, broken forms/auth, JS crash preventing interaction)
-- "medium": degrades experience but page still usable (some failed requests, non-fatal console errors)
-- "low": cosmetic or minor (missing alt text patterns, very few interactive elements found, minor warnings)
-
-If there are no console/network errors and buttons/forms/inputs seem reasonable across all pages, return an empty issues array and a positive summary.
+If nothing stands out beyond the already-reported errors, return an empty issues array and a summary that references the error counts.
 Do not include markdown formatting, code fences, or any text outside the JSON object.
 `;
 
@@ -209,13 +276,19 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
 
   let analysis: AnalysisResult;
   try {
-    analysis = JSON.parse(rawContent);
-    if (!Array.isArray(analysis.issues)) analysis.issues = [];
+    const parsed = JSON.parse(rawContent);
+    const aiIssues: Issue[] = Array.isArray(parsed.issues) ? parsed.issues : [];
+    analysis = {
+      summary: parsed.summary || '',
+      priorityFix: parsed.priorityFix || '',
+      // Triaged (rule-based) issues first since they're the most actionable, then AI judgment calls
+      issues: [...triagedIssues, ...aiIssues],
+    };
   } catch (err) {
     analysis = {
       summary: 'Analysis unavailable — could not parse AI response.',
       priorityFix: '',
-      issues: [],
+      issues: triagedIssues,
     };
   }
 

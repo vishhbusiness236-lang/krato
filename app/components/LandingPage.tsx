@@ -143,9 +143,6 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <a href="#how-it-works" className="rounded-xl border-2 border-[#0A0A0A] bg-[#FAFAF9] px-4 py-2 text-sm font-semibold text-[#0A0A0A] shadow-[4px_4px_0px_0px_#0A0A0A] transition-all duration-300 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_#0A0A0A]">
-              Sign In
-            </a>
             <Button type="button" onClick={handleGetStarted}>
               Get Started
             </Button>
