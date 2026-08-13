@@ -9,6 +9,11 @@ interface Issue {
   description: string;
   severity: 'critical' | 'medium' | 'low';
   location?: string;
+  endpoint?: string;
+  method?: string;
+  statusCode?: number | string;
+  reproSteps?: string[];
+  evidence?: string;
 }
 
 interface Analysis {
@@ -51,6 +56,10 @@ function severityBadgeTone(severity: string) {
   }
 }
 
+function issueKey(issue: Issue) {
+  return `${issue.type}-${issue.description}-${issue.endpoint || ''}`;
+}
+
 export default function HomePageClient() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -65,6 +74,9 @@ export default function HomePageClient() {
   const [badgeOpen, setBadgeOpen] = useState(false);
   const [copied, setCopied] = useState({ markdown: false, html: false });
   const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  const [linearConnected, setLinearConnected] = useState(false);
+  const [ticketState, setTicketState] = useState<Record<string, { loading: boolean; url?: string; error?: string }>>({});
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -102,11 +114,88 @@ export default function HomePageClient() {
     };
   }, []);
 
+  useEffect(() => {
+    async function checkLinearStatus() {
+      try {
+        const res = await fetch('/api/integrations/linear/status');
+        if (res.ok) {
+          const data = await res.json();
+          setLinearConnected(!!data.connected);
+        }
+      } catch (err) {
+        console.error('Failed to check Linear status', err);
+      }
+    }
+    checkLinearStatus();
+  }, [userEmail]);
+
+  function connectLinear() {
+    const clientId = process.env.NEXT_PUBLIC_LINEAR_CLIENT_ID;
+    const redirectUri = process.env.NEXT_PUBLIC_LINEAR_REDIRECT_URI;
+    const state = crypto.randomUUID();
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('linear_oauth_state', state);
+    }
+
+    const authUrl = `https://linear.app/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+      redirectUri || ''
+    )}&response_type=code&scope=write&state=${state}`;
+
+    window.location.href = authUrl;
+  }
+
+  async function createLinearTicket(issue: Issue) {
+    const key = issueKey(issue);
+    setTicketState((prev) => ({ ...prev, [key]: { loading: true } }));
+
+    try {
+      const res = await fetch('/api/integrations/linear/create-ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${issue.type}: ${issue.description}`.slice(0, 120),
+          description: [
+            issue.description,
+            issue.endpoint ? `Endpoint: ${issue.method || 'GET'} ${issue.endpoint}` : '',
+            issue.statusCode !== undefined ? `Status: ${issue.statusCode}` : '',
+            issue.location ? `Location: ${issue.location}` : '',
+            issue.reproSteps && issue.reproSteps.length > 0
+              ? `Reproduction steps:\n${issue.reproSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+              : '',
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
+          severity: issue.severity,
+          scanUrl: result?.scanData?.url,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.status === 401 && data.needsConnect) {
+        setLinearConnected(false);
+        setTicketState((prev) => ({ ...prev, [key]: { loading: false, error: 'Connect Linear first' } }));
+        return;
+      }
+
+      if (!res.ok) {
+        setTicketState((prev) => ({ ...prev, [key]: { loading: false, error: data.error || 'Failed to create ticket' } }));
+        return;
+      }
+
+      setTicketState((prev) => ({ ...prev, [key]: { loading: false, url: data.ticketUrl } }));
+    } catch (err: any) {
+      setTicketState((prev) => ({ ...prev, [key]: { loading: false, error: err.message || 'Failed to create ticket' } }));
+    }
+  }
+
   async function handleScan() {
     if (!url) return;
     setLoading(true);
     setError('');
     setResult(null);
+    setTicketState({});
 
     try {
       const res = await fetch('/api/scan', {
@@ -201,6 +290,7 @@ export default function HomePageClient() {
       } else {
         setResult(data);
         setUrl(data.scanData.url);
+        setTicketState({});
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load scan');
@@ -253,6 +343,11 @@ export default function HomePageClient() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {userEmail ? <span className="rounded-full border-2 border-[#0A0A0A] bg-[#FAFAF9] px-3 py-1 text-xs font-semibold text-[#404040]">{userEmail}</span> : null}
+              {linearConnected ? (
+                <Badge tone="mint">Linear connected</Badge>
+              ) : (
+                <Button onClick={connectLinear} variant="secondary">Connect Linear</Button>
+              )}
               <Button onClick={toggleHistory} variant="secondary">History</Button>
               {userEmail ? <Button onClick={handleSignOut} variant="ghost">Sign out</Button> : null}
             </div>
@@ -362,18 +457,60 @@ export default function HomePageClient() {
                   <div>
                     <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#404040]">Issues</h3>
                     <div className="mt-3 space-y-3">
-                      {sortedIssues.map((issue) => (
-                        <Card key={`${issue.type}-${issue.description}`} className="p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold">{issue.type}</p>
-                              <p className="mt-1 text-sm text-[#404040]">{issue.description}</p>
+                      {sortedIssues.map((issue) => {
+                        const key = issueKey(issue);
+                        const ticket = ticketState[key];
+                        return (
+                          <Card key={key} className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold">{issue.type}</p>
+                                <p className="mt-1 text-sm text-[#404040]">{issue.description}</p>
+                              </div>
+                              <Badge tone={severityBadgeTone(issue.severity)}>{issue.severity}</Badge>
                             </div>
-                            <Badge tone={severityBadgeTone(issue.severity)}>{issue.severity}</Badge>
-                          </div>
-                          {issue.location && <p className="mt-2 text-xs text-[#404040]">Location: {issue.location}</p>}
-                        </Card>
-                      ))}
+
+                            {issue.endpoint && (
+                              <p className="mt-2 rounded-lg bg-[#0A0A0A]/5 px-2 py-1 font-mono text-xs text-[#0A0A0A]">
+                                {issue.method || 'GET'} {issue.endpoint}
+                                {issue.statusCode !== undefined && ` → ${issue.statusCode}`}
+                              </p>
+                            )}
+
+                            {issue.reproSteps && issue.reproSteps.length > 0 && (
+                              <details className="mt-2">
+                                <summary className="cursor-pointer text-xs font-semibold text-[#404040]">
+                                  Reproduction steps
+                                </summary>
+                                <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-xs text-[#404040]">
+                                  {issue.reproSteps.map((step, idx) => (
+                                    <li key={idx}>{step}</li>
+                                  ))}
+                                </ol>
+                              </details>
+                            )}
+
+                            {issue.location && <p className="mt-2 text-xs text-[#404040]">Location: {issue.location}</p>}
+
+                            <div className="mt-3 flex items-center gap-2">
+                              {ticket?.url ? (
+                                <a href={ticket.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-cyan-700 underline">
+                                  View in Linear →
+                                </a>
+                              ) : (
+                                <Button
+                                  onClick={() => (linearConnected ? createLinearTicket(issue) : connectLinear())}
+                                  variant="secondary"
+                                  disabled={ticket?.loading}
+                                >
+                                  {ticket?.loading ? 'Creating...' : linearConnected ? 'Create Linear Ticket' : 'Connect Linear to create ticket'}
+                                </Button>
+                              )}
+                              {ticket?.error && <span className="text-xs text-red-600">{ticket.error}</span>}
+                            </div>
+                          </Card>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
