@@ -213,8 +213,26 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
       }
     });
     page.on('pageerror', (err) => consoleErrors.push(err.message));
+    const NOISE_URL_PATTERNS = [
+      /\/collect(\?|$)/i,           // GA/GTM tracking beacons (g/collect, ccm/collect etc.)
+      /google-analytics\.com/i,
+      /googletagmanager\.com/i,
+      /doubleclick\.net/i,
+      /facebook\.com\/tr/i,
+      /connect\.facebook\.net/i,
+      /hotjar\.com/i,
+      /segment\.io/i,
+      /mixpanel\.com/i,
+      /sentry\.io/i,
+      /analytics/i,
+    ];
+
+    function isNoiseUrl(url: string) {
+      return NOISE_URL_PATTERNS.some((pattern) => pattern.test(url));
+    }
+
     page.on('response', (res) => {
-      if (res.status() >= 400) {
+      if (res.status() >= 400 && !isNoiseUrl(res.url())) {
         networkErrors.push({
           url: res.url(),
           status: res.status(),
@@ -223,11 +241,13 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
       }
     });
     page.on('requestfailed', (request) => {
-      networkErrors.push({
-        url: request.url(),
-        status: 'FAILED',
-        method: request.method(),
-      });
+      if (!isNoiseUrl(request.url())) {
+        networkErrors.push({
+          url: request.url(),
+          status: 'FAILED',
+          method: request.method(),
+        });
+      }
     });
 
     try {
