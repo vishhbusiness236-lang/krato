@@ -43,6 +43,8 @@ interface HistoryItem {
   created_at: string;
 }
 
+type ExplorationStyle = 'happy_path' | 'edge_case';
+
 const severityOrder: Record<string, number> = { critical: 0, medium: 1, low: 2 };
 
 function severityBadgeTone(severity: string) {
@@ -62,6 +64,7 @@ function issueKey(issue: Issue) {
 
 export default function HomePageClient() {
   const [url, setUrl] = useState('');
+  const [style, setStyle] = useState<ExplorationStyle>('happy_path');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState('');
@@ -201,7 +204,7 @@ export default function HomePageClient() {
       const res = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, email: email || undefined }),
+        body: JSON.stringify({ url, email: email || undefined, style }),
       });
       const data = await res.json();
 
@@ -379,6 +382,35 @@ export default function HomePageClient() {
                 Schedule Daily
               </Button>
             </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-[#404040]">Exploration style</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStyle('happy_path')}
+                className={`rounded-xl border-2 border-[#0A0A0A] px-4 py-2 text-sm font-semibold transition ${
+                  style === 'happy_path' ? 'bg-[#0A0A0A] text-white' : 'bg-[#FAFAF9] text-[#0A0A0A]'
+                }`}
+              >
+                Happy Path
+              </button>
+              <button
+                type="button"
+                onClick={() => setStyle('edge_case')}
+                className={`rounded-xl border-2 border-[#0A0A0A] px-4 py-2 text-sm font-semibold transition ${
+                  style === 'edge_case' ? 'bg-[#0A0A0A] text-white' : 'bg-[#FAFAF9] text-[#0A0A0A]'
+                }`}
+              >
+                Edge Case
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-[#404040]">
+              {style === 'edge_case'
+                ? 'Fills forms with extreme/invalid data and force-submits them to probe validation.'
+                : 'Scans normally, like a real user browsing the app.'}
+            </p>
           </div>
 
           <div className="mt-4">

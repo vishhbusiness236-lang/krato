@@ -13,13 +13,13 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
-    const { url, email } = await req.json();
+    const { url, email, style } = await req.json();
 
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
-    const { scanData, analysis, screenshotBase64 } = await runScan(url);
+    const { scanData, analysis, screenshotBase64 } = await runScan(url, style || 'happy_path');
 
     const supabase = await createClient();
     const {
