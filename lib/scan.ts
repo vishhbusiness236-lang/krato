@@ -225,6 +225,8 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
       /mixpanel\.com/i,
       /sentry\.io/i,
       /analytics/i,
+      /\/videoplayback/i,
+      /googlevideo\.com/i,
     ];
 
     function isNoiseUrl(url: string) {
