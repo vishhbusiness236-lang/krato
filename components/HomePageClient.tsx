@@ -35,6 +35,7 @@ interface ScanResult {
   };
   analysis: Analysis;
   screenshot: string;
+  isPublic?: boolean;
 }
 
 interface HistoryItem {
@@ -43,7 +44,7 @@ interface HistoryItem {
   created_at: string;
 }
 
-type ExplorationStyle = 'happy_path' | 'edge_case';
+type ExplorationStyle = 'happy_path' | 'edge_case' | 'adversarial' | 'security';
 
 const severityOrder: Record<string, number> = { critical: 0, medium: 1, low: 2 };
 
@@ -58,8 +59,8 @@ function severityBadgeTone(severity: string) {
   }
 }
 
-function issueKey(issue: Issue) {
-  return `${issue.type}-${issue.description}-${issue.endpoint || ''}`;
+function issueKey(issue: Issue, index: number) {
+  return `${issue.type}-${issue.description}-${issue.endpoint || ''}-${index}`;
 }
 
 export default function HomePageClient() {
@@ -75,8 +76,9 @@ export default function HomePageClient() {
   const [email, setEmail] = useState('');
   const [origin, setOrigin] = useState('');
   const [badgeOpen, setBadgeOpen] = useState(false);
-  const [copied, setCopied] = useState({ markdown: false, html: false });
+  const [copied, setCopied] = useState({ markdown: false, html: false, share: false });
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const [linearConnected, setLinearConnected] = useState(false);
   const [ticketState, setTicketState] = useState<Record<string, { loading: boolean; url?: string; error?: string }>>({});
@@ -148,8 +150,8 @@ export default function HomePageClient() {
     window.location.href = authUrl;
   }
 
-  async function createLinearTicket(issue: Issue) {
-    const key = issueKey(issue);
+  async function createLinearTicket(issue: Issue, index: number) {
+    const key = issueKey(issue, index);
     setTicketState((prev) => ({ ...prev, [key]: { loading: true } }));
 
     try {
@@ -302,6 +304,40 @@ export default function HomePageClient() {
     }
   }
 
+  async function toggleShare() {
+    if (!result?.scanId) return;
+    setSharing(true);
+    try {
+      const newValue = !result.isPublic;
+      const res = await fetch(`/api/history/${result.scanId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublic: newValue }),
+      });
+      if (!res.ok) throw new Error('Failed to update sharing');
+      setResult((prev) => (prev ? { ...prev, isPublic: newValue } : prev));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update sharing status.');
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  async function copyShareLink() {
+    if (!result?.scanId) return;
+    const link = `${origin}/report/${result.scanId}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied((prev) => ({ ...prev, share: true }));
+      window.setTimeout(() => {
+        setCopied((prev) => ({ ...prev, share: false }));
+      }, 1500);
+    } catch (err) {
+      console.error('Clipboard copy failed', err);
+    }
+  }
+
   async function copyToClipboard(text: string, type: 'markdown' | 'html') {
     try {
       await navigator.clipboard.writeText(text);
@@ -386,7 +422,7 @@ export default function HomePageClient() {
 
           <div className="mt-4">
             <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-[#404040]">Exploration style</label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setStyle('happy_path')}
@@ -405,11 +441,30 @@ export default function HomePageClient() {
               >
                 Edge Case
               </button>
+              <button
+                type="button"
+                onClick={() => setStyle('adversarial')}
+                className={`rounded-xl border-2 border-[#0A0A0A] px-4 py-2 text-sm font-semibold transition ${
+                  style === 'adversarial' ? 'bg-[#0A0A0A] text-white' : 'bg-[#FAFAF9] text-[#0A0A0A]'
+                }`}
+              >
+                Adversarial
+              </button>
+              <button
+                type="button"
+                onClick={() => setStyle('security')}
+                className={`rounded-xl border-2 border-[#0A0A0A] px-4 py-2 text-sm font-semibold transition ${
+                  style === 'security' ? 'bg-[#0A0A0A] text-white' : 'bg-[#FAFAF9] text-[#0A0A0A]'
+                }`}
+              >
+                Security
+              </button>
             </div>
             <p className="mt-1 text-xs text-[#404040]">
-              {style === 'edge_case'
-                ? 'Fills forms with extreme/invalid data and force-submits them to probe validation.'
-                : 'Scans normally, like a real user browsing the app.'}
+              {style === 'edge_case' && 'Fills forms with extreme/invalid data and force-submits them to probe validation.'}
+              {style === 'adversarial' && 'Rapid-clicks buttons and double-submits forms to probe for race conditions.'}
+              {style === 'security' && 'Probes inputs with XSS/injection patterns to check for unescaped output (safe, non-destructive).'}
+              {style === 'happy_path' && 'Scans normally, like a real user browsing the app.'}
             </p>
           </div>
 
@@ -446,9 +501,36 @@ export default function HomePageClient() {
                   <Button onClick={() => setBadgeOpen((open) => !open)} variant="secondary">
                     {badgeOpen ? 'Hide Badge' : 'Embed Badge'}
                   </Button>
+                  {result.scanId && (
+                    <Button onClick={toggleShare} variant="secondary" disabled={sharing}>
+                      {sharing ? 'Updating...' : result.isPublic ? 'Unshare Report' : 'Share Report'}
+                    </Button>
+                  )}
                   <Badge tone={criticalCount > 0 ? 'red' : totalIssues > 0 ? 'amber' : 'mint'}>{totalIssues > 0 ? `${totalIssues} issues found` : 'No issues found'}</Badge>
                 </div>
               </div>
+
+              {result.isPublic && result.scanId && (
+                <Card className="mt-4 bg-[#D1FAE5] p-4 text-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-[#0A0A0A]">This report is public</p>
+                      <p className="text-xs text-[#404040]">Anyone with the link can view it — no login required.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`${origin}/report/${result.scanId}`}
+                        className="flex-1 rounded-xl border-2 border-[#0A0A0A] bg-white px-3 py-2 text-xs text-[#0A0A0A]"
+                      />
+                      <Button onClick={copyShareLink} variant="secondary">
+                        {copied.share ? 'Copied!' : 'Copy Link'}
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )}
 
               {badgeOpen && (
                 <Card className="mt-4 bg-[#FAFAF9] p-4 text-sm">
@@ -489,8 +571,8 @@ export default function HomePageClient() {
                   <div>
                     <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#404040]">Issues</h3>
                     <div className="mt-3 space-y-3">
-                      {sortedIssues.map((issue) => {
-                        const key = issueKey(issue);
+                      {sortedIssues.map((issue, index) => {
+                        const key = issueKey(issue, index);
                         const ticket = ticketState[key];
                         return (
                           <Card key={key} className="p-4">
@@ -531,7 +613,7 @@ export default function HomePageClient() {
                                 </a>
                               ) : (
                                 <Button
-                                  onClick={() => (linearConnected ? createLinearTicket(issue) : connectLinear())}
+                                  onClick={() => (linearConnected ? createLinearTicket(issue, index) : connectLinear())}
                                   variant="secondary"
                                   disabled={ticket?.loading}
                                 >
