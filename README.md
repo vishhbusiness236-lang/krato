@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# krato
 
-## Getting Started
+AI agent that scans ur live web app nd finds whats broken. buttons, forms, console errors, 500s, all that.
 
-First, run the development server:
+live: kratoai.vercel.app
 
-```bash
+## what it does
+
+give it a url, it crawls a few pages n gives u actual bugs not vague stuff. exact endpoint, status code, repro steps.
+
+4 scan modes:
+- happy path - normal browsing
+- edge case - garbage data in forms, finds validation bugs
+- adversarial - rapid clicks, double submits
+- security - basic xss checks, not a full pentest
+
+also does linear tickets, public report links, pdf export, scan history
+
+## stack
+
+next.js 16, supabase, playwright, groq for ai, vercel
+
+## running locally
+
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+need ur own .env.local w supabase/groq/linear keys
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## why
 
-## Learn More
+im 15, been building ai stuff solo for a year+, kept shipping bugs n only finding out when someone comlpained- figured other solo devs have same problem so built this
 
-To learn more about Next.js, take a look at the following resources:
+## status
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+still building, adding auto journey discovery next so u dont have to tell it what to test(kinda cool)
