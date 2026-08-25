@@ -253,6 +253,106 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
           </div>
         </section>
 
+        <section className="mt-16">
+          <FadeUp className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-700">Comparison</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[#0A0A0A] sm:text-4xl">
+              How Krato stacks up.
+            </h2>
+          </FadeUp>
+
+          <FadeUp className="mt-8 overflow-x-auto rounded-[24px] border-2 border-[#0A0A0A] bg-[#FAFAF9] p-4 shadow-[4px_4px_0px_0px_#0A0A0A] sm:p-6">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="p-3 text-left text-xs font-semibold uppercase tracking-[0.15em] text-[#404040]">Feature</th>
+                  <th className="rounded-t-xl bg-gradient-to-br from-emerald-100 to-cyan-100 p-3 text-center text-sm font-semibold text-emerald-700">Krato</th>
+                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">Momentic</th>
+                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">Marker.io</th>
+                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">QA.tech</th>
+                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">ReviseFlow</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Triaged bug reports', 1, 1, 1, 1, 1],
+                  ['Scheduled scan alerts', 1, 0, 0, 1, 0],
+                  ['Ticketing integration', 1, 0, 1, 1, 1],
+                  ['Session replay', 1, 0, 1, 1, 0],
+                  ['Custom exploration styles', 1, 0, 0, 0, 0],
+                  ['AI fix suggestions', 1, 1, 0, 0, 0],
+                  ['GitHub auto-PR', 1, 0, 0, 0, 0],
+                  ['Solo-dev flat pricing', 1, 0, 0, 0, 0],
+                  ['Accessibility checks', 1, 0, 0, 0, 0],
+                  ['Regression diffing', 1, 0, 0, 0, 0],
+                  ['Public shareable reports', 1, 0, 0, 0, 0],
+                  ['Core Web Vitals scoring', 1, 0, 0, 0, 0],
+                  ['CLI/CI integration', 1, 0, 0, 0, 0],
+                ].map(([label, ...cols], rowIndex) => (
+                  <tr key={label as string} className={rowIndex % 2 === 0 ? 'bg-white/50' : ''}>
+                    <td className="p-3 text-[#0A0A0A]">{label}</td>
+                    {cols.map((val, i) => (
+                      <td key={i} className={`p-3 text-center ${i === 0 ? 'bg-emerald-50/60' : ''}`}>
+                        {val ? <span className="text-emerald-600">✓</span> : <span className="text-[#B0B0B0]">—</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </FadeUp>
+        </section>
+
+                <section className="mt-16">
+          <FadeUp className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-700">Comparison</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[#0A0A0A] sm:text-4xl">
+              How Krato stacks up.
+            </h2>
+          </FadeUp>
+
+          <FadeUp className="mt-8 overflow-x-auto rounded-[24px] border-2 border-[#0A0A0A] bg-[#FAFAF9] p-4 shadow-[4px_4px_0px_0px_#0A0A0A] sm:p-6">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="p-3 text-left text-xs font-semibold uppercase tracking-[0.15em] text-[#404040]">Feature</th>
+                  <th className="rounded-t-xl bg-gradient-to-br from-emerald-100 to-cyan-100 p-3 text-center text-sm font-semibold text-emerald-700">Krato</th>
+                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">Momentic</th>
+                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">Marker.io</th>
+                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">QA.tech</th>
+                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">ReviseFlow</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Triaged bug reports', 1, 1, 1, 1, 1],
+                  ['Scheduled scan alerts', 1, 0, 0, 1, 0],
+                  ['Ticketing integration', 1, 0, 1, 1, 1],
+                  ['Session replay', 1, 0, 1, 1, 0],
+                  ['Custom exploration styles', 1, 0, 0, 0, 0],
+                  ['AI fix suggestions', 1, 1, 0, 0, 0],
+                  ['GitHub auto-PR', 1, 0, 0, 0, 0],
+                  ['Solo-dev flat pricing', 1, 0, 0, 0, 0],
+                  ['Accessibility checks', 1, 0, 0, 0, 0],
+                  ['Regression diffing', 1, 0, 0, 0, 0],
+                  ['Public shareable reports', 1, 0, 0, 0, 0],
+                  ['Core Web Vitals scoring', 1, 0, 0, 0, 0],
+                  ['CLI/CI integration', 1, 0, 0, 0, 0],
+                ].map(([label, ...cols], rowIndex) => (
+                  <tr key={label as string} className={rowIndex % 2 === 0 ? 'bg-white/50' : ''}>
+                    <td className="p-3 text-[#0A0A0A]">{label}</td>
+                    {cols.map((val, i) => (
+                      <td key={i} className={`p-3 text-center ${i === 0 ? 'bg-emerald-50/60' : ''}`}>
+                        {val ? <span className="text-emerald-600">✓</span> : <span className="text-[#B0B0B0]">—</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </FadeUp>
+        </section>
+
         <FadeUp className="mt-16 rounded-[28px] border-2 border-[#0A0A0A] bg-gradient-to-br from-emerald-50 via-white to-cyan-50 px-6 py-8 shadow-[4px_4px_0px_0px_#0A0A0A] sm:px-10 lg:px-12">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
