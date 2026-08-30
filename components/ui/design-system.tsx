@@ -92,9 +92,9 @@ export function Badge({
 }) {
   const toneClass = {
     mint: 'border-[#0A0A0A] bg-[#D1FAE5] text-[#065F46]',
-    cyan: 'border-[#0A0A0A] bg-cyan-50 text-cyan-700',
-    amber: 'border-[#0A0A0A] bg-amber-50 text-amber-700',
-    red: 'border-[#0A0A0A] bg-red-50 text-red-700',
+    cyan: 'border-[#0A0A0A] bg-cyan-100 text-cyan-800',
+    amber: 'border-[#0A0A0A] bg-amber-200 text-amber-900',
+    red: 'border-[#0A0A0A] bg-red-100 text-red-800',
   }[tone];
 
   return <span className={`inline-flex items-center rounded-full border-2 px-3 py-1 text-xs font-semibold ${toneClass} ${className}`}>{children}</span>;

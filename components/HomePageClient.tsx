@@ -74,6 +74,10 @@ export default function HomePageClient() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [email, setEmail] = useState('');
+  const [scheduleHour, setScheduleHour] = useState('09');
+  const [scheduleMinute, setScheduleMinute] = useState('00');
+  const [schedulePeriod, setSchedulePeriod] = useState<'AM' | 'PM'>('AM');
+  const [schedulingOpen, setSchedulingOpen] = useState(false);
   const [origin, setOrigin] = useState('');
   const [badgeOpen, setBadgeOpen] = useState(false);
   const [copied, setCopied] = useState({ markdown: false, html: false, share: false });
@@ -248,16 +252,29 @@ export default function HomePageClient() {
     }
   }
 
-  async function scheduleDailyScan() {
+  function to24Hour(hour: string, period: 'AM' | 'PM') {
+    let h = parseInt(hour, 10);
+    if (period === 'AM') {
+      if (h === 12) h = 0;
+    } else {
+      if (h !== 12) h += 12;
+    }
+    return h.toString().padStart(2, '0');
+  }
+
+  async function confirmScheduleDailyScan() {
     if (!url) return;
+    const scheduledTime = `${to24Hour(scheduleHour, schedulePeriod)}:${scheduleMinute}`;
+    const displayTime = `${scheduleHour}:${scheduleMinute} ${schedulePeriod}`;
     try {
       const res = await fetch('/api/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, scheduledTime }),
       });
       if (!res.ok) throw new Error('Failed to schedule');
-      alert('Daily scan scheduled for this URL!');
+      alert(`Daily scan scheduled for this URL at ${displayTime}!`);
+      setSchedulingOpen(false);
     } catch (err) {
       console.error(err);
       alert('Failed to schedule scan.');
@@ -414,11 +431,57 @@ export default function HomePageClient() {
               <Button onClick={handleScan} variant="primary" disabled={loading} suppressHydrationWarning>
                 {loading ? 'Scanning...' : 'Scan'}
               </Button>
-              <Button onClick={scheduleDailyScan} variant="secondary" disabled={!url}>
+                           <Button onClick={() => setSchedulingOpen((open) => !open)} variant="secondary" disabled={!url}>
                 Schedule Daily
               </Button>
             </div>
           </div>
+
+          {schedulingOpen && (
+            <Card className="mt-3 bg-[#FAFAF9] p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-[#404040]">
+                What time should the daily scan run?
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={scheduleHour}
+                  onChange={(e) => setScheduleHour(e.target.value)}
+                  aria-label="Hour"
+                  className="rounded-xl border-2 border-[#0A0A0A] bg-white px-3 py-2 text-sm text-[#0A0A0A] outline-none transition focus:ring-2 focus:ring-cyan-400"
+                >
+                  {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')).map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+                <span className="text-sm font-semibold text-[#404040]">:</span>
+                <select
+                  value={scheduleMinute}
+                  onChange={(e) => setScheduleMinute(e.target.value)}
+                  aria-label="Minute"
+                  className="rounded-xl border-2 border-[#0A0A0A] bg-white px-3 py-2 text-sm text-[#0A0A0A] outline-none transition focus:ring-2 focus:ring-cyan-400"
+                >
+                  {['00', '15', '30', '45'].map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <select
+                  value={schedulePeriod}
+                  onChange={(e) => setSchedulePeriod(e.target.value as 'AM' | 'PM')}
+                  aria-label="AM or PM"
+                  className="rounded-xl border-2 border-[#0A0A0A] bg-white px-3 py-2 text-sm text-[#0A0A0A] outline-none transition focus:ring-2 focus:ring-cyan-400"
+                >
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
+                <Button onClick={confirmScheduleDailyScan} variant="primary">
+                  Confirm
+                </Button>
+                <Button onClick={() => setSchedulingOpen(false)} variant="ghost">
+                  Cancel
+                </Button>
+              </div>
+            </Card>
+          )}
 
           <div className="mt-4">
             <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-[#404040]">Exploration style</label>

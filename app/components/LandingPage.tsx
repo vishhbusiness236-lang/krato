@@ -94,7 +94,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
     },
     {
       title: 'Get an actionable report',
-      description: 'Every issue is ranked by severity and ready to fix or share with your team.',
+      description: 'See what broke, how bad it is, and what to fix first.',
     },
   ];
 
@@ -112,7 +112,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
     {
       title: 'Console Error Tracking',
       description: 'Surfaces JavaScript errors hiding in the background.',
-      icon: '⚠',
+      icon: '!',
     },
     {
       title: 'Network Failure Monitoring',
@@ -122,12 +122,47 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
     {
       title: 'PDF Reports',
       description: 'Export clean, shareable reports in one click.',
-      icon: '⬇',
+      icon: '↓',
     },
     {
       title: 'Scheduled Scans',
       description: 'Set it once — Krato checks your site automatically, on repeat.',
-      icon: '⏰',
+      icon: '⟳',
+    },
+  ];
+
+  const comparisonRows: [string, number, number, number, number, number][] = [
+    ['Triaged bug reports', 1, 1, 1, 1, 1],
+    ['Scheduled scan alerts', 1, 0, 0, 1, 0],
+    ['Ticketing integration', 1, 0, 1, 1, 1],
+    ['Session replay', 1, 0, 1, 1, 0],
+    ['Custom exploration styles', 1, 0, 0, 0, 0],
+    ['AI fix suggestions', 1, 1, 0, 0, 0],
+    ['GitHub auto-PR', 1, 0, 0, 0, 0],
+    ['Solo-dev flat pricing', 1, 0, 0, 0, 0],
+    ['Accessibility checks', 1, 0, 0, 0, 0],
+    ['Regression diffing', 1, 0, 0, 0, 0],
+    ['Public shareable reports', 1, 0, 0, 0, 0],
+    ['Core Web Vitals scoring', 1, 0, 0, 0, 0],
+    ['CLI/CI integration', 1, 0, 0, 0, 0],
+  ];
+
+  const faqs = [
+    {
+      q: 'Will this slow down my website?',
+      a: 'No. Krato scans your live site from the outside, like a visitor would. It does not touch your code or add anything to your site.',
+    },
+    {
+      q: 'How long does setup take?',
+      a: 'There is no setup. Paste your URL and Krato starts scanning right away.',
+    },
+    {
+      q: 'What does the free plan include?',
+      a: 'You can run scans and get a full report for free. No card needed to start.',
+    },
+    {
+      q: 'What counts as a "security" scan?',
+      a: 'Security mode runs basic app-level checks — things like unescaped input and obvious weak spots. It is not a full security audit.',
     },
   ];
 
@@ -243,7 +278,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((feature, index) => (
               <FadeUp key={feature.title} className="rounded-[24px] border-2 border-[#0A0A0A] bg-[#FAFAF9] p-6 shadow-[4px_4px_0px_0px_#0A0A0A] transition-all duration-300 hover:-translate-y-1 hover:shadow-[2px_2px_0px_0px_#0A0A0A]" delay={index * 75}>
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-cyan-100 text-lg text-emerald-700">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-cyan-100 text-lg font-semibold text-emerald-700">
                   {feature.icon}
                 </div>
                 <h3 className="mt-4 text-lg font-semibold text-[#0A0A0A]">{feature.title}</h3>
@@ -274,72 +309,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  ['Triaged bug reports', 1, 1, 1, 1, 1],
-                  ['Scheduled scan alerts', 1, 0, 0, 1, 0],
-                  ['Ticketing integration', 1, 0, 1, 1, 1],
-                  ['Session replay', 1, 0, 1, 1, 0],
-                  ['Custom exploration styles', 1, 0, 0, 0, 0],
-                  ['AI fix suggestions', 1, 1, 0, 0, 0],
-                  ['GitHub auto-PR', 1, 0, 0, 0, 0],
-                  ['Solo-dev flat pricing', 1, 0, 0, 0, 0],
-                  ['Accessibility checks', 1, 0, 0, 0, 0],
-                  ['Regression diffing', 1, 0, 0, 0, 0],
-                  ['Public shareable reports', 1, 0, 0, 0, 0],
-                  ['Core Web Vitals scoring', 1, 0, 0, 0, 0],
-                  ['CLI/CI integration', 1, 0, 0, 0, 0],
-                ].map(([label, ...cols], rowIndex) => (
-                  <tr key={label as string} className={rowIndex % 2 === 0 ? 'bg-white/50' : ''}>
-                    <td className="p-3 text-[#0A0A0A]">{label}</td>
-                    {cols.map((val, i) => (
-                      <td key={i} className={`p-3 text-center ${i === 0 ? 'bg-emerald-50/60' : ''}`}>
-                        {val ? <span className="text-emerald-600">✓</span> : <span className="text-[#B0B0B0]">—</span>}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </FadeUp>
-        </section>
-
-                <section className="mt-16">
-          <FadeUp className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-700">Comparison</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[#0A0A0A] sm:text-4xl">
-              How Krato stacks up.
-            </h2>
-          </FadeUp>
-
-          <FadeUp className="mt-8 overflow-x-auto rounded-[24px] border-2 border-[#0A0A0A] bg-[#FAFAF9] p-4 shadow-[4px_4px_0px_0px_#0A0A0A] sm:p-6">
-            <table className="w-full min-w-[640px] border-collapse text-sm">
-              <thead>
-                <tr>
-                  <th className="p-3 text-left text-xs font-semibold uppercase tracking-[0.15em] text-[#404040]">Feature</th>
-                  <th className="rounded-t-xl bg-gradient-to-br from-emerald-100 to-cyan-100 p-3 text-center text-sm font-semibold text-emerald-700">Krato</th>
-                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">Momentic</th>
-                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">Marker.io</th>
-                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">QA.tech</th>
-                  <th className="p-3 text-center text-xs font-semibold text-[#404040]">ReviseFlow</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ['Triaged bug reports', 1, 1, 1, 1, 1],
-                  ['Scheduled scan alerts', 1, 0, 0, 1, 0],
-                  ['Ticketing integration', 1, 0, 1, 1, 1],
-                  ['Session replay', 1, 0, 1, 1, 0],
-                  ['Custom exploration styles', 1, 0, 0, 0, 0],
-                  ['AI fix suggestions', 1, 1, 0, 0, 0],
-                  ['GitHub auto-PR', 1, 0, 0, 0, 0],
-                  ['Solo-dev flat pricing', 1, 0, 0, 0, 0],
-                  ['Accessibility checks', 1, 0, 0, 0, 0],
-                  ['Regression diffing', 1, 0, 0, 0, 0],
-                  ['Public shareable reports', 1, 0, 0, 0, 0],
-                  ['Core Web Vitals scoring', 1, 0, 0, 0, 0],
-                  ['CLI/CI integration', 1, 0, 0, 0, 0],
-                ].map(([label, ...cols], rowIndex) => (
-                  <tr key={label as string} className={rowIndex % 2 === 0 ? 'bg-white/50' : ''}>
+                {comparisonRows.map(([label, ...cols], rowIndex) => (
+                  <tr key={label} className={rowIndex % 2 === 0 ? 'bg-white/50' : ''}>
                     <td className="p-3 text-[#0A0A0A]">{label}</td>
                     {cols.map((val, i) => (
                       <td key={i} className={`p-3 text-center ${i === 0 ? 'bg-emerald-50/60' : ''}`}>
@@ -371,19 +342,42 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 <p className="mt-1 text-sm text-[#404040]">Issue types caught</p>
               </div>
               <div className="rounded-2xl border-2 border-[#0A0A0A] bg-[#FAFAF9] px-4 py-3 text-center shadow-[4px_4px_0px_0px_#0A0A0A]">
-                <p className="text-2xl font-semibold text-cyan-700">100%</p>
-                <p className="mt-1 text-sm text-[#404040]">Built for solo devs</p>
+                <p className="text-2xl font-semibold text-cyan-700">Free</p>
+                <p className="mt-1 text-sm text-[#404040]">To start scanning</p>
               </div>
             </div>
           </div>
         </FadeUp>
+
+        <section className="mt-16">
+          <FadeUp className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-700">FAQ</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[#0A0A0A] sm:text-4xl">
+              Questions people ask.
+            </h2>
+          </FadeUp>
+
+          <div className="mx-auto mt-8 max-w-3xl space-y-3">
+            {faqs.map((item, index) => (
+              <FadeUp key={item.q} delay={index * 60}>
+                <details className="group rounded-[20px] border-2 border-[#0A0A0A] bg-[#FAFAF9] p-5 shadow-[4px_4px_0px_0px_#0A0A0A]">
+                  <summary className="flex cursor-pointer list-none items-center justify-between text-left text-base font-semibold text-[#0A0A0A]">
+                    {item.q}
+                    <span className="ml-4 text-[#404040] transition-transform duration-200 group-open:rotate-45">+</span>
+                  </summary>
+                  <p className="mt-3 text-sm leading-7 text-[#404040]">{item.a}</p>
+                </details>
+              </FadeUp>
+            ))}
+          </div>
+        </section>
 
         <FadeUp className="mt-16 rounded-[32px] border-2 border-[#0A0A0A] bg-gradient-to-br from-cyan-500 via-cyan-500 to-emerald-500 px-8 py-12 text-center text-white shadow-[8px_8px_0px_0px_#0A0A0A] sm:px-10 lg:px-16">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             Stop finding bugs after your users do.
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg leading-8 text-cyan-50">
-            Bring QA into your release loop with a polished, always-on agent that spots issues before they turn into customer-facing problems.
+            Paste a URL. Get a clear report in under a minute — before a real user hits the broken button.
           </p>
           <Button type="button" onClick={handleGetStarted} className="mt-8 bg-white text-emerald-700 shadow-[4px_4px_0px_0px_#0A0A0A] hover:shadow-[2px_2px_0px_0px_#0A0A0A]">
             Get Started Free

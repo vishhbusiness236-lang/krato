@@ -3,7 +3,7 @@ import { chromium as playwrightChromium } from 'playwright-core';
 
 const MAX_PAGES = 5;
 
-export type ExplorationStyle = 'happy_path' | 'edge_case';
+export type ExplorationStyle = 'happy_path' | 'edge_case' | 'adversarial' | 'security';
 
 export interface Issue {
   type: string;
@@ -37,7 +37,8 @@ interface PageScan {
   inputsCount: number;
   consoleErrors: string[];
   networkErrors: NetworkErrorEntry[];
-  edgeCaseAttempts?: string[];
+  interactionAttempts?: string[];
+  securityFindings?: string[];
 }
 
 async function getBrowser() {
@@ -53,6 +54,13 @@ async function getBrowser() {
   }
 }
 
+// ---------- HAPPY PATH ----------
+// No extra interaction — plain crawl + observe. Handled by the default loop, no helper needed.
+
+// ---------- EDGE CASE ----------
+// Fills inputs with extreme/invalid data and force-submits forms, to surface
+// validation gaps and crashes that happy-path scanning won't catch.
+
 const EDGE_CASE_VALUES: Record<string, string> = {
   text: 'A'.repeat(500),
   email: 'not-an-email',
@@ -64,8 +72,6 @@ const EDGE_CASE_VALUES: Record<string, string> = {
   default: "' OR '1'='1",
 };
 
-// Fills inputs with deliberately bad/extreme data and attempts to submit forms,
-// to surface validation gaps and crashes that happy-path scanning won't catch.
 async function runEdgeCaseInteractions(page: any): Promise<string[]> {
   const attempts: string[] = [];
 
@@ -79,14 +85,13 @@ async function runEdgeCaseInteractions(page: any): Promise<string[]> {
         const type = (await input.getAttribute('type')) || 'text';
         const value = EDGE_CASE_VALUES[type] || EDGE_CASE_VALUES.default;
         await input.fill(value, { timeout: 3000 });
-        await input.blur().catch(() => {}); // trigger validation-on-blur handlers
+        await input.blur().catch(() => {});
         attempts.push(`Filled input[type=${type}] with edge-case value`);
-        await page.waitForTimeout(300); // give validation/UI time to react
+        await page.waitForTimeout(300);
       } catch {
         // input not fillable (e.g. disabled, readonly) — skip
       }
     }
-
 
     const forms = page.locator('form');
     const formCount = await forms.count();
@@ -96,7 +101,7 @@ async function runEdgeCaseInteractions(page: any): Promise<string[]> {
         if (await submitBtn.count() > 0) {
           await submitBtn.click({ timeout: 3000, force: true });
           attempts.push(`Submitted form #${i + 1} with edge-case data`);
-          await page.waitForTimeout(2000); // longer wait to catch delayed errors/crashes post-submit
+          await page.waitForTimeout(2000);
         }
       } catch {
         // submit failed/blocked — that's fine, we just record the attempt
@@ -109,7 +114,137 @@ async function runEdgeCaseInteractions(page: any): Promise<string[]> {
   return attempts;
 }
 
-function buildTriagedIssues(pageScans: PageScan[]): Issue[] {
+// ---------- ADVERSARIAL ----------
+// Rapid multi-click on buttons (race condition probing), double-submits forms,
+// and back/forward navigation spam — designed to surface bugs that only show up
+// under rushed/repeated real-world usage (double charges, duplicate submits, etc).
+
+async function runAdversarialInteractions(page: any): Promise<string[]> {
+  const attempts: string[] = [];
+
+  try {
+    const buttons = page.locator('button:not([disabled])');
+    const buttonCount = await buttons.count();
+
+    for (let i = 0; i < Math.min(buttonCount, 8); i++) {
+      const button = buttons.nth(i);
+      try {
+        // rapid multi-click — probes for race conditions / duplicate-action bugs
+        await button.click({ timeout: 2000, force: true });
+        await button.click({ timeout: 2000, force: true });
+        await button.click({ timeout: 2000, force: true });
+        attempts.push(`Rapid triple-clicked button #${i + 1}`);
+        await page.waitForTimeout(500);
+      } catch {
+        // button not clickable — skip
+      }
+    }
+
+    const forms = page.locator('form');
+    const formCount = await forms.count();
+    for (let i = 0; i < Math.min(formCount, 3); i++) {
+      try {
+        const submitBtn = forms.nth(i).locator('button[type="submit"], input[type="submit"]').first();
+        if (await submitBtn.count() > 0) {
+          // double-submit — probes for duplicate-submission bugs (e.g. double charge)
+          await submitBtn.click({ timeout: 2000, force: true });
+          await submitBtn.click({ timeout: 2000, force: true });
+          attempts.push(`Double-submitted form #${i + 1}`);
+          await page.waitForTimeout(1500);
+        }
+      } catch {
+        // skip
+      }
+    }
+
+    // back/forward navigation spam — probes for state bugs on rapid nav
+    try {
+      await page.goBack({ timeout: 3000 }).catch(() => {});
+      await page.goForward({ timeout: 3000 }).catch(() => {});
+      attempts.push('Spammed back/forward navigation');
+    } catch {
+      // skip
+    }
+  } catch (err) {
+    // non-fatal — adversarial pass is best-effort
+  }
+
+  return attempts;
+}
+
+// ---------- SECURITY ----------
+// Fills inputs with XSS/injection/template-injection payloads (safe, non-destructive,
+// no real attacks executed) and checks whether the payload comes back unescaped in the
+// page HTML — a signal of missing output sanitization. This is a basic application-level
+// sanity check, not a full security audit.
+
+const SECURITY_PAYLOADS = [
+  '<script>alert(1)</script>',
+  '"><img src=x onerror=alert(1)>',
+  '{{7*7}}',
+  '${7*7}',
+  "'; DROP TABLE users; --",
+];
+
+async function runSecurityInteractions(page: any): Promise<{ attempts: string[]; findings: string[] }> {
+  const attempts: string[] = [];
+  const findings: string[] = [];
+
+  try {
+    const inputs = page.locator(
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="password"]), textarea'
+    );
+    const count = await inputs.count();
+
+    for (let i = 0; i < Math.min(count, 10); i++) {
+      const input = inputs.nth(i);
+      const payload = SECURITY_PAYLOADS[i % SECURITY_PAYLOADS.length];
+      try {
+        await input.fill(payload, { timeout: 3000 });
+        await input.blur().catch(() => {});
+        attempts.push(`Filled input #${i + 1} with security payload`);
+        await page.waitForTimeout(300);
+      } catch {
+        continue;
+      }
+    }
+
+    const forms = page.locator('form');
+    const formCount = await forms.count();
+    for (let i = 0; i < Math.min(formCount, 3); i++) {
+      try {
+        const submitBtn = forms.nth(i).locator('button[type="submit"], input[type="submit"]').first();
+        if (await submitBtn.count() > 0) {
+          await submitBtn.click({ timeout: 3000, force: true });
+          attempts.push(`Submitted form #${i + 1} with security payloads`);
+          await page.waitForTimeout(1500);
+        }
+      } catch {
+        // skip
+      }
+    }
+
+    // check if any payload got reflected unescaped in the page
+    try {
+      const html = await page.content();
+      for (const payload of SECURITY_PAYLOADS) {
+        if (payload.includes('<script>') || payload.includes('<img')) {
+          if (html.includes(payload)) {
+            findings.push(`Payload reflected unescaped in page HTML: ${payload} — possible missing output sanitization.`);
+          }
+        }
+      }
+    } catch {
+      // skip
+    }
+  } catch (err) {
+    // non-fatal — security pass is best-effort
+  }
+
+  return { attempts, findings };
+}
+
+function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Issue[] {
   const issues: Issue[] = [];
 
   for (const page of pageScans) {
@@ -153,15 +288,45 @@ function buildTriagedIssues(pageScans: PageScan[]): Issue[] {
       });
     }
 
-    if (page.edgeCaseAttempts && page.edgeCaseAttempts.length > 0) {
+    if (page.interactionAttempts && page.interactionAttempts.length > 0) {
+      const label =
+        style === 'adversarial'
+          ? 'Adversarial Exploration'
+          : style === 'security'
+          ? 'Security Exploration'
+          : 'Edge Case Exploration';
+
+      const descriptionByStyle: Record<string, string> = {
+        adversarial: `Ran ${page.interactionAttempts.length} adversarial interaction(s) on this page (rapid multi-clicks, double-submits, back/forward navigation spam) to probe for race conditions and duplicate-action bugs.`,
+        security: `Ran ${page.interactionAttempts.length} security interaction(s) on this page (XSS/injection payloads in inputs and forms) to probe for missing input sanitization. This is a basic app-level check, not a full security audit.`,
+        edge_case: `Ran ${page.interactionAttempts.length} edge-case interaction(s) on this page (extreme/invalid input values, forced form submits).`,
+      };
+
       issues.push({
-        type: 'Edge Case Exploration',
-        description: `Ran ${page.edgeCaseAttempts.length} edge-case interaction(s) on this page (extreme/invalid input values, forced form submits).`,
+        type: label,
+        description: descriptionByStyle[style] || descriptionByStyle.edge_case,
         severity: 'low',
         location: page.url,
-        evidence: page.edgeCaseAttempts.join('; '),
-        reproSteps: page.edgeCaseAttempts,
+        evidence: page.interactionAttempts.join('; '),
+        reproSteps: page.interactionAttempts,
       });
+    }
+
+    if (page.securityFindings && page.securityFindings.length > 0) {
+      for (const finding of page.securityFindings) {
+        issues.push({
+          type: 'Possible Unsanitized Input',
+          description: finding,
+          severity: 'critical',
+          location: page.url,
+          evidence: finding,
+          reproSteps: [
+            `Visit ${page.url}`,
+            'Submit a form or input field with an XSS-style payload (e.g. <script>alert(1)</script>)',
+            'Check page HTML — payload appears unescaped instead of encoded',
+          ],
+        });
+      }
     }
   }
 
@@ -203,6 +368,9 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
       /third-party cookie/i,
       /\[Report Only\]/i,
       /Content Security Policy/i,
+      /fburl\.com/i,
+      /Credential Management service/i,
+      /ErrorUtils caught an error/i,
     ];
 
     page.on('console', (msg) => {
@@ -213,8 +381,9 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
       }
     });
     page.on('pageerror', (err) => consoleErrors.push(err.message));
+
     const NOISE_URL_PATTERNS = [
-      /\/collect(\?|$)/i,           // GA/GTM tracking beacons (g/collect, ccm/collect etc.)
+      /\/collect(\?|$)/i,
       /google-analytics\.com/i,
       /googletagmanager\.com/i,
       /doubleclick\.net/i,
@@ -229,8 +398,8 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
       /googlevideo\.com/i,
     ];
 
-    function isNoiseUrl(url: string) {
-      return NOISE_URL_PATTERNS.some((pattern) => pattern.test(url));
+    function isNoiseUrl(u: string) {
+      return NOISE_URL_PATTERNS.some((pattern) => pattern.test(u));
     }
 
     page.on('response', (res) => {
@@ -274,12 +443,19 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     const forms = await page.locator('form').count();
     const inputs = await page.locator('input').count();
 
-    let edgeCaseAttempts: string[] | undefined;
+    let interactionAttempts: string[] | undefined;
+    let securityFindings: string[] | undefined;
+
     if (style === 'edge_case') {
-      edgeCaseAttempts = await runEdgeCaseInteractions(page);
-      // errors triggered by edge-case interactions will already have been
-      // captured by the console/response listeners above
+      interactionAttempts = await runEdgeCaseInteractions(page);
+    } else if (style === 'adversarial') {
+      interactionAttempts = await runAdversarialInteractions(page);
+    } else if (style === 'security') {
+      const result = await runSecurityInteractions(page);
+      interactionAttempts = result.attempts;
+      securityFindings = result.findings;
     }
+    // happy_path: no extra interaction, just observe
 
     if (currentUrl === url) {
       const screenshotBuffer = await page.screenshot({ fullPage: true });
@@ -294,7 +470,8 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
       inputsCount: inputs,
       consoleErrors,
       networkErrors,
-      edgeCaseAttempts,
+      interactionAttempts,
+      securityFindings,
     });
 
     if (pageScans.length < MAX_PAGES) {
@@ -332,7 +509,7 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     networkErrors: pageScans.flatMap((p) => p.networkErrors),
   };
 
-  const triagedIssues = buildTriagedIssues(pageScans);
+  const triagedIssues = buildTriagedIssues(pageScans, style);
 
   const pageBreakdown = pageScans
     .map(
@@ -341,17 +518,22 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     )
     .join('\n');
 
-  const styleNote =
-    style === 'edge_case'
-      ? 'This scan used EDGE CASE exploration: inputs were filled with extreme/invalid values and forms were force-submitted to probe validation and error handling.'
-      : 'This scan used HAPPY PATH exploration: normal browsing behavior, no adversarial input.';
+  const styleNotes: Record<ExplorationStyle, string> = {
+    happy_path: 'This scan used HAPPY PATH exploration: normal browsing behavior, no adversarial input.',
+    edge_case:
+      'This scan used EDGE CASE exploration: inputs were filled with extreme/invalid values and forms were force-submitted to probe validation and error handling.',
+    adversarial:
+      'This scan used ADVERSARIAL exploration: buttons were rapid-clicked and forms double-submitted to probe for race conditions and duplicate-action bugs.',
+    security:
+      'This scan used SECURITY exploration: inputs were filled with XSS/injection-style payloads to check for basic missing output sanitization. This is a sanity check, not a full security audit.',
+  };
 
   const prompt = `
 You are a QA expert analyzing a multi-page website scan report.
 
 Start URL: ${url}
 Exploration style: ${style}
-${styleNote}
+${styleNotes[style]}
 Pages scanned: ${scanData.pagesScanned}
 
 Per-page breakdown:
@@ -369,7 +551,8 @@ Respond with ONLY valid JSON in this exact structure, nothing else:
       "type": "short issue name",
       "description": "plain-English explanation, mention which page(s) affected if relevant",
       "severity": "critical" | "medium" | "low",
-      "location": "the specific page URL this issue was found on, if applicable"
+      "location": "the specific page URL this issue was found on, if applicable",
+      "reproSteps": ["step 1", "step 2", "step 3"]
     }
   ]
 }
@@ -385,7 +568,7 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
       Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-20b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
       response_format: { type: 'json_object' },
@@ -398,7 +581,16 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
   let analysis: AnalysisResult;
   try {
     const parsed = JSON.parse(rawContent);
-    const aiIssues: Issue[] = Array.isArray(parsed.issues) ? parsed.issues : [];
+    const aiIssues: Issue[] = (Array.isArray(parsed.issues) ? parsed.issues : []).map((issue: Issue) => {
+      const cleanSteps = (issue.reproSteps || []).filter((s) => typeof s === 'string' && s.trim().length > 0);
+      return {
+        ...issue,
+        reproSteps:
+          cleanSteps.length > 0
+            ? cleanSteps
+            : [`Visit ${issue.location || url}`, `Review: ${issue.description}`, 'Confirm the issue is still present'],
+      };
+    });
     analysis = {
       summary: parsed.summary || '',
       priorityFix: parsed.priorityFix || '',
