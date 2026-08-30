@@ -457,7 +457,25 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     }
     // happy_path: no extra interaction, just observe
 
-    if (currentUrl === url) {
+       if (currentUrl === url) {
+      // scroll through the page first to trigger lazy-loaded content before capturing
+      await page.evaluate(async () => {
+        await new Promise<void>((resolve) => {
+          let totalHeight = 0;
+          const distance = 300;
+          const timer = setInterval(() => {
+            const scrollHeight = document.body.scrollHeight;
+            window.scrollBy(0, distance);
+            totalHeight += distance;
+            if (totalHeight >= scrollHeight) {
+              clearInterval(timer);
+              window.scrollTo(0, 0);
+              resolve();
+            }
+          }, 100);
+        });
+      });
+      await page.waitForTimeout(500);
       const screenshotBuffer = await page.screenshot({ fullPage: true });
       screenshotBase64 = screenshotBuffer.toString('base64');
     }
@@ -539,7 +557,7 @@ Pages scanned: ${scanData.pagesScanned}
 Per-page breakdown:
 ${pageBreakdown}
 
-Note: network and console errors are already reported separately with exact endpoints and status codes, so do NOT repeat them in your issues list. Only add issues that require judgment — e.g. suspiciously few buttons/forms/inputs for the page type, structural concerns, weak input validation implied by the exploration style, or UX red flags visible from the data.
+Note: network and console errors are already reported separately with exact endpoints and status codes, so do NOT repeat them in your issues list. Only add issues that require judgment — e.g. suspiciously few buttons/forms/inputs for the page type, structural concerns, weak input validation implied by the exploration style, or UX red flags visible from the data. IMPORTANT: the per-page breakdown above shows counts for EACH individual page separately — do not assume a page has zero buttons/forms/inputs unless that exact page's line in the breakdown shows 0. Cross-check against the per-page numbers before flagging a "missing interactive elements" issue, and always name the specific page URL, not the site as a whole.
 
 Respond with ONLY valid JSON in this exact structure, nothing else:
 
@@ -597,6 +615,8 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
       issues: [...triagedIssues, ...aiIssues],
     };
   } catch (err) {
+    console.error('🔥 Groq parse failed. Raw content was:', rawContent);
+    console.error('🔥 Parse error:', err);
     analysis = {
       summary: 'Analysis unavailable — could not parse AI response.',
       priorityFix: '',
