@@ -24,6 +24,16 @@ export interface AnalysisResult {
   issues: Issue[];
 }
 
+export interface JourneyStep {
+  label: string;
+  pageUrl: string;
+}
+
+export interface Journey {
+  name: string;
+  steps: JourneyStep[];
+}
+
 interface NetworkErrorEntry {
   url: string;
   status: number | string;
@@ -40,6 +50,12 @@ interface PageScan {
   networkErrors: NetworkErrorEntry[];
   interactionAttempts?: string[];
   securityFindings?: string[];
+}
+
+interface JourneyStepCandidate {
+  category: string;
+  label: string;
+  pageUrl: string;
 }
 
 async function getBrowser() {
@@ -356,6 +372,139 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
   return issues;
 }
 
+// ---------- JOURNEY DISCOVERY (Phase 1: detect-only) ----------
+// Heuristic pass: scan button/link text across all pages for known journey-step
+// keywords (signup, login, cart, checkout, etc). This does NOT execute anything —
+// it just tags text that LOOKS like a journey step, on which page it lives.
+// Phase 2 (deferred, not built here) would have the crawler actually walk these
+// steps in order.
+
+const JOURNEY_PATTERNS: { category: string; regex: RegExp }[] = [
+  { category: 'signup', regex: /sign\s?up|register|create\s+an?\s+account|join\s+now|start\s+free\s+trial/i },
+  { category: 'login', regex: /log\s?in|sign\s?in/i },
+  { category: 'onboarding', regex: /get\s+started|start\s+onboarding|continue\s+setup|complete\s+setup/i },
+  { category: 'cart', regex: /add\s+to\s+cart|add\s+to\s+bag/i },
+  { category: 'checkout', regex: /checkout|proceed\s+to\s+(pay|checkout)|place\s+order/i },
+  { category: 'payment', regex: /pay\s+now|payment|billing|confirm\s+payment/i },
+  { category: 'dashboard', regex: /dashboard|my\s+account|my\s+profile/i },
+  { category: 'search', regex: /^search$/i },
+  { category: 'subscribe', regex: /subscribe|newsletter/i },
+  { category: 'contact', regex: /contact\s+us|get\s+in\s+touch/i },
+];
+
+const MAX_JOURNEY_CANDIDATES = 25;
+
+function detectJourneyCandidates(pageScans: PageScan[]): JourneyStepCandidate[] {
+  const candidates: JourneyStepCandidate[] = [];
+  const seen = new Set<string>();
+
+  for (const page of pageScans) {
+    for (const text of page.buttons) {
+      const trimmed = text.trim();
+      if (!trimmed) continue;
+      for (const { category, regex } of JOURNEY_PATTERNS) {
+        if (regex.test(trimmed)) {
+          const key = `${category}::${page.url}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            candidates.push({ category, label: trimmed, pageUrl: page.url });
+          }
+          break;
+        }
+      }
+    }
+
+    for (const link of page.links) {
+      let linkText = '';
+      try {
+        const parsed = new URL(link);
+        linkText = parsed.pathname.replace(/[-/]/g, ' ').trim();
+      } catch {
+        continue;
+      }
+      if (!linkText) continue;
+      for (const { category, regex } of JOURNEY_PATTERNS) {
+        if (regex.test(linkText)) {
+          const key = `${category}::${page.url}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            candidates.push({ category, label: linkText, pageUrl: page.url });
+          }
+          break;
+        }
+      }
+    }
+
+    if (candidates.length >= MAX_JOURNEY_CANDIDATES) break;
+  }
+
+  return candidates.slice(0, MAX_JOURNEY_CANDIDATES);
+}
+
+async function buildJourneysWithAI(candidates: JourneyStepCandidate[]): Promise<Journey[]> {
+  if (candidates.length === 0) return [];
+
+  const candidateList = candidates
+    .map((c, i) => `${i + 1}. category="${c.category}", label="${c.label}", page="${c.pageUrl}"`)
+    .join('\n');
+
+  const prompt = `
+You are analyzing a website's UI elements to identify likely user journeys (multi-step flows a real user would follow, like Signup → Login → Dashboard, or Add to Cart → Checkout → Payment).
+
+Below is a list of candidate journey-step elements found on the site, with their category, visible label, and which page they appear on. Do NOT invent steps that aren't in this list — only group and order what's given.
+
+Candidates:
+${candidateList}
+
+Group these into 1-3 distinct, logically-ordered user journeys. Each journey should have a short descriptive name (e.g. "Signup to Dashboard", "Purchase Flow") and an ordered list of steps, each referencing one of the candidates above by its exact label and page.
+
+If the candidates don't form any coherent multi-step journey (e.g. only one category present, or nothing that logically chains), return an empty array.
+
+Respond with ONLY valid JSON in this exact structure, nothing else:
+
+{
+  "journeys": [
+    {
+      "name": "short journey name",
+      "steps": [
+        { "label": "exact label from candidates", "pageUrl": "exact page from candidates" }
+      ]
+    }
+  ]
+}
+
+Do not include markdown formatting, code fences, or any text outside the JSON object.
+`;
+
+  try {
+    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-20b',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    const groqData = await groqResponse.json();
+    const rawContent = groqData.choices?.[0]?.message?.content;
+    const parsed = JSON.parse(rawContent);
+    const journeys: Journey[] = Array.isArray(parsed.journeys) ? parsed.journeys : [];
+
+    return journeys.filter(
+      (j) => j && typeof j.name === 'string' && Array.isArray(j.steps) && j.steps.length > 0
+    );
+  } catch (err) {
+    console.error('🔥 Journey discovery Groq call failed:', err);
+    return [];
+  }
+}
+
 export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy_path') {
   let url = inputUrl;
   if (!/^https?:\/\//i.test(url)) {
@@ -552,6 +701,10 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
 
   const triagedIssues = buildTriagedIssues(pageScans, style);
 
+  // Journey Discovery (Phase 1: detect-only) — heuristic candidates, then AI groups/orders them
+  const journeyCandidates = detectJourneyCandidates(pageScans);
+  const journeys = await buildJourneysWithAI(journeyCandidates);
+
   const pageBreakdown = pageScans
     .map(
       (p) =>
@@ -622,6 +775,11 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
   const groqData = await groqResponse.json();
   const rawContent = groqData.choices?.[0]?.message?.content;
 
+  if (!rawContent) {
+    console.error('🔥 Groq API did not return content. Status:', groqResponse.status);
+    console.error('🔥 Full Groq response:', JSON.stringify(groqData, null, 2));
+  }
+
   let analysis: AnalysisResult;
   try {
     const parsed = JSON.parse(rawContent);
@@ -654,5 +812,5 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
     };
   }
 
-  return { scanData, analysis, screenshotBase64 };
+  return { scanData, analysis, screenshotBase64, journeys };
 }
