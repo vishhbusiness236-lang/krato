@@ -11,6 +11,7 @@ interface Issue {
   method?: string;
   statusCode?: number | string;
   reproSteps?: string[];
+  suggestedFix?: string;
 }
 
 function severityBadgeTone(severity: string) {
@@ -135,6 +136,13 @@ export default async function PublicReportPage({
                     )}
 
                     {issue.location && <p className="mt-2 break-words text-xs text-[#404040]">Location: {issue.location}</p>}
+
+                    {issue.suggestedFix && (
+                      <div className="mt-3 rounded-lg border-2 border-[#0A0A0A] bg-[#F7FAFA] px-3 py-2">
+                        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#404040]">Suggested Fix</p>
+                        <p className="mt-1 break-words text-sm text-[#0A0A0A]">{issue.suggestedFix}</p>
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>

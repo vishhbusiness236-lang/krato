@@ -15,6 +15,7 @@ export interface Issue {
   statusCode?: number | string;
   reproSteps?: string[];
   evidence?: string;
+  suggestedFix?: string;
 }
 
 export interface AnalysisResult {
@@ -258,8 +259,20 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
       const severity: Issue['severity'] =
         err.status === 'FAILED' || statusNum >= 500 ? 'critical' : 'medium';
 
+      const isServerError = statusNum >= 500 || err.status === 'FAILED';
+      const suggestedFix =
+        err.status === 'FAILED'
+          ? `Check if ${err.method} ${endpointPath} is reachable — could be a timeout, CORS block, DNS issue, or the endpoint being down. Add error handling/retry logic on the frontend for this call.`
+          : statusNum >= 500
+          ? `Server threw a ${err.status} on ${err.method} ${endpointPath} — check server-side logs for a stack trace and add a try/catch around the failing handler.`
+          : statusNum === 404
+          ? `${err.method} ${endpointPath} returned 404 — the route may be missing, misspelled, or not deployed. Verify the endpoint exists and the frontend is calling the right path.`
+          : statusNum === 401 || statusNum === 403
+          ? `${err.method} ${endpointPath} returned ${err.status} — check that auth tokens/cookies are being sent correctly and that the user has the right permissions for this action.`
+          : `${err.method} ${endpointPath} returned ${err.status} — inspect the request payload and response body to see why it failed, and add proper error handling on the client.`;
+
       issues.push({
-        type: statusNum >= 500 || err.status === 'FAILED' ? 'Network Failure' : 'Failed Request',
+        type: isServerError ? 'Network Failure' : 'Failed Request',
         description:
           err.status === 'FAILED'
             ? `Request to ${endpointPath} failed to complete (network error or timeout).`
@@ -274,6 +287,7 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
           `Trigger the action that calls ${err.method} ${endpointPath}`,
           `Observe response: ${err.status}`,
         ],
+        suggestedFix,
       });
     }
 
@@ -285,6 +299,7 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
         location: page.url,
         evidence: errText,
         reproSteps: [`Visit ${page.url}`, 'Open browser DevTools console', 'Error appears on load or interaction'],
+        suggestedFix: `Open DevTools on ${page.url} and reproduce this error to get the full stack trace, then trace it back to the source file/line. Common causes: a null/undefined value being accessed before it's ready, or a third-party script failing to load — wrap the risky code in a try/catch or add a null check.`,
       });
     }
 
@@ -302,6 +317,12 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
         edge_case: `Ran ${page.interactionAttempts.length} edge-case interaction(s) on this page (extreme/invalid input values, forced form submits).`,
       };
 
+      const suggestedFixByStyle: Record<string, string> = {
+        adversarial: `Add debouncing/disabling on buttons after first click (disable while a request is in-flight) and idempotency keys on form submissions to prevent duplicate actions like double charges.`,
+        security: `If any payload reflected unescaped (see below), sanitize/escape all user input before rendering it back to the page. Otherwise, no action needed — this was just the probe pass.`,
+        edge_case: `Add proper input validation (client + server side) for extreme values — length limits, type checks, and rejecting malformed input with a clear error message instead of letting the form submit silently.`,
+      };
+
       issues.push({
         type: label,
         description: descriptionByStyle[style] || descriptionByStyle.edge_case,
@@ -309,6 +330,7 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
         location: page.url,
         evidence: page.interactionAttempts.join('; '),
         reproSteps: page.interactionAttempts,
+        suggestedFix: suggestedFixByStyle[style] || suggestedFixByStyle.edge_case,
       });
     }
 
@@ -325,6 +347,7 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
             'Submit a form or input field with an XSS-style payload (e.g. <script>alert(1)</script>)',
             'Check page HTML — payload appears unescaped instead of encoded',
           ],
+          suggestedFix: `Escape/encode this input before rendering it (use your framework's built-in escaping — e.g. React does this by default unless you're using dangerouslySetInnerHTML). If this is server-rendered, run it through an HTML sanitizer before output. Never render raw user input directly into the DOM.`,
         });
       }
     }
@@ -559,6 +582,8 @@ ${pageBreakdown}
 
 Note: network and console errors are already reported separately with exact endpoints and status codes, so do NOT repeat them in your issues list. Only add issues that require judgment — e.g. suspiciously few buttons/forms/inputs for the page type, structural concerns, weak input validation implied by the exploration style, or UX red flags visible from the data. IMPORTANT: the per-page breakdown above shows counts for EACH individual page separately — do not assume a page has zero buttons/forms/inputs unless that exact page's line in the breakdown shows 0. Cross-check against the per-page numbers before flagging a "missing interactive elements" issue, and always name the specific page URL, not the site as a whole.
 
+For every issue you list, also include a "suggestedFix" — a concrete, actionable fix (1-3 sentences, plain English or a short code-level pointer). Be specific to the issue, not generic advice.
+
 Respond with ONLY valid JSON in this exact structure, nothing else:
 
 {
@@ -570,7 +595,8 @@ Respond with ONLY valid JSON in this exact structure, nothing else:
       "description": "plain-English explanation, mention which page(s) affected if relevant",
       "severity": "critical" | "medium" | "low",
       "location": "the specific page URL this issue was found on, if applicable",
-      "reproSteps": ["step 1", "step 2", "step 3"]
+      "reproSteps": ["step 1", "step 2", "step 3"],
+      "suggestedFix": "concrete, actionable fix for this specific issue"
     }
   ]
 }
@@ -607,6 +633,10 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
           cleanSteps.length > 0
             ? cleanSteps
             : [`Visit ${issue.location || url}`, `Review: ${issue.description}`, 'Confirm the issue is still present'],
+        suggestedFix:
+          typeof issue.suggestedFix === 'string' && issue.suggestedFix.trim().length > 0
+            ? issue.suggestedFix
+            : undefined,
       };
     });
     analysis = {
