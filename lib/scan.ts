@@ -768,6 +768,7 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
       model: 'openai/gpt-oss-20b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
+      max_tokens: 4096,
       response_format: { type: 'json_object' },
     }),
   });

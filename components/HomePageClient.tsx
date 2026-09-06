@@ -14,12 +14,23 @@ interface Issue {
   statusCode?: number | string;
   reproSteps?: string[];
   evidence?: string;
+  suggestedFix?: string;
 }
 
 interface Analysis {
   summary: string;
   priorityFix: string;
   issues: Issue[];
+}
+
+interface JourneyStep {
+  label: string;
+  pageUrl: string;
+}
+
+interface Journey {
+  name: string;
+  steps: JourneyStep[];
 }
 
 interface ScanResult {
@@ -36,12 +47,18 @@ interface ScanResult {
   analysis: Analysis;
   screenshot: string;
   isPublic?: boolean;
+  journeys?: Journey[];
 }
 
 interface HistoryItem {
   id: string;
   url: string;
   created_at: string;
+}
+
+interface GithubRepo {
+  fullName: string;
+  private: boolean;
 }
 
 type ExplorationStyle = 'happy_path' | 'edge_case' | 'adversarial' | 'security';
@@ -86,6 +103,11 @@ export default function HomePageClient() {
 
   const [linearConnected, setLinearConnected] = useState(false);
   const [ticketState, setTicketState] = useState<Record<string, { loading: boolean; url?: string; error?: string }>>({});
+
+  const [githubConnected, setGithubConnected] = useState(false);
+  const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState('');
+  const [issueState, setIssueState] = useState<Record<string, { loading: boolean; url?: string; error?: string }>>({});
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -138,6 +160,39 @@ export default function HomePageClient() {
     checkLinearStatus();
   }, [userEmail]);
 
+  useEffect(() => {
+    async function checkGithubStatus() {
+      try {
+        const res = await fetch('/api/integrations/github/status');
+        if (res.ok) {
+          const data = await res.json();
+          setGithubConnected(!!data.connected);
+        }
+      } catch (err) {
+        console.error('Failed to check GitHub status', err);
+      }
+    }
+    checkGithubStatus();
+  }, [userEmail]);
+
+  useEffect(() => {
+    async function loadRepos() {
+      if (!githubConnected) return;
+      try {
+        const res = await fetch('/api/integrations/github/repos');
+        if (res.ok) {
+          const data = await res.json();
+          const repos: GithubRepo[] = data.repos || [];
+          setGithubRepos(repos);
+          if (repos.length > 0) setSelectedRepo((prev) => prev || repos[0].fullName);
+        }
+      } catch (err) {
+        console.error('Failed to load GitHub repos', err);
+      }
+    }
+    loadRepos();
+  }, [githubConnected]);
+
   function connectLinear() {
     const clientId = process.env.NEXT_PUBLIC_LINEAR_CLIENT_ID;
     const redirectUri = process.env.NEXT_PUBLIC_LINEAR_REDIRECT_URI;
@@ -150,6 +205,22 @@ export default function HomePageClient() {
     const authUrl = `https://linear.app/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri || ''
     )}&response_type=code&scope=write&state=${state}`;
+
+    window.location.href = authUrl;
+  }
+
+  function connectGithub() {
+    const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+    const redirectUri = process.env.NEXT_PUBLIC_GITHUB_REDIRECT_URI;
+    const state = crypto.randomUUID();
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('github_oauth_state', state);
+    }
+
+    const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+      redirectUri || ''
+    )}&scope=repo&state=${state}`;
 
     window.location.href = authUrl;
   }
@@ -199,12 +270,64 @@ export default function HomePageClient() {
     }
   }
 
+  async function createGithubIssue(issue: Issue, index: number) {
+    const key = issueKey(issue, index);
+
+    if (!selectedRepo) {
+      setIssueState((prev) => ({ ...prev, [key]: { loading: false, error: 'Select a repo first' } }));
+      return;
+    }
+
+    setIssueState((prev) => ({ ...prev, [key]: { loading: true } }));
+
+    try {
+      const res = await fetch('/api/integrations/github/create-issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${issue.type}: ${issue.description}`.slice(0, 120),
+          description: [
+            issue.description,
+            issue.endpoint ? `Endpoint: ${issue.method || 'GET'} ${issue.endpoint}` : '',
+            issue.statusCode !== undefined ? `Status: ${issue.statusCode}` : '',
+            issue.location ? `Location: ${issue.location}` : '',
+            issue.reproSteps && issue.reproSteps.length > 0
+              ? `Reproduction steps:\n${issue.reproSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+              : '',
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
+          scanUrl: result?.scanData?.url,
+          repo: selectedRepo,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.status === 401 && data.needsConnect) {
+        setGithubConnected(false);
+        setIssueState((prev) => ({ ...prev, [key]: { loading: false, error: 'Connect GitHub first' } }));
+        return;
+      }
+
+      if (!res.ok) {
+        setIssueState((prev) => ({ ...prev, [key]: { loading: false, error: data.error || 'Failed to create issue' } }));
+        return;
+      }
+
+      setIssueState((prev) => ({ ...prev, [key]: { loading: false, url: data.ticketUrl } }));
+    } catch (err: any) {
+      setIssueState((prev) => ({ ...prev, [key]: { loading: false, error: err.message || 'Failed to create issue' } }));
+    }
+  }
+
   async function handleScan() {
     if (!url) return;
     setLoading(true);
     setError('');
     setResult(null);
     setTicketState({});
+    setIssueState({});
 
     try {
       const res = await fetch('/api/scan', {
@@ -313,6 +436,7 @@ export default function HomePageClient() {
         setResult(data);
         setUrl(data.scanData.url);
         setTicketState({});
+        setIssueState({});
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load scan');
@@ -384,6 +508,7 @@ export default function HomePageClient() {
   );
   const criticalCount = issues.filter((i) => i.severity === 'critical').length;
   const totalIssues = issues.length;
+  const journeys: Journey[] = result?.journeys || [];
 
   return (
     <div className="min-h-screen bg-[#FAFAF9] text-[#0A0A0A]">
@@ -404,10 +529,30 @@ export default function HomePageClient() {
               ) : (
                 <Button onClick={connectLinear} variant="secondary">Connect Linear</Button>
               )}
+              {githubConnected ? (
+                <Badge tone="mint">GitHub connected</Badge>
+              ) : (
+                <Button onClick={connectGithub} variant="secondary">Connect GitHub</Button>
+              )}
               <Button onClick={toggleHistory} variant="secondary">History</Button>
               {userEmail ? <Button onClick={handleSignOut} variant="ghost">Sign out</Button> : null}
             </div>
           </div>
+
+          {githubConnected && githubRepos.length > 0 && (
+            <div className="mt-4 flex items-center gap-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#404040]">GitHub repo</label>
+              <select
+                value={selectedRepo}
+                onChange={(e) => setSelectedRepo(e.target.value)}
+                className="rounded-xl border-2 border-[#0A0A0A] bg-white px-3 py-2 text-sm text-[#0A0A0A] outline-none transition focus:ring-2 focus:ring-cyan-400"
+              >
+                {githubRepos.map((repo) => (
+                  <option key={repo.fullName} value={repo.fullName}>{repo.fullName}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </Card>
 
         {historyOpen && (
@@ -631,12 +776,40 @@ export default function HomePageClient() {
                     <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#404040]">Priority Fix</h3>
                     <p className="mt-1 text-sm text-[#404040]">{result.analysis.priorityFix}</p>
                   </div>
+
+                  {journeys.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#404040]">Detected User Journeys</h3>
+                      <div className="mt-3 space-y-3">
+                        {journeys.map((journey, jIndex) => (
+                          <Card key={`${journey.name}-${jIndex}`} className="p-4">
+                            <p className="text-sm font-semibold">{journey.name}</p>
+                            <div className="mt-3 space-y-2">
+                              {journey.steps.map((step, sIndex) => (
+                                <div key={`${step.label}-${sIndex}`} className="flex items-start gap-2">
+                                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-[#0A0A0A] bg-[#F7FAFA] text-[10px] font-semibold">
+                                    {sIndex + 1}
+                                  </span>
+                                  <div>
+                                    <p className="text-sm text-[#0A0A0A]">{step.label}</p>
+                                    <p className="text-xs text-[#404040]">{step.pageUrl}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#404040]">Issues</h3>
                     <div className="mt-3 space-y-3">
                       {sortedIssues.map((issue, index) => {
                         const key = issueKey(issue, index);
                         const ticket = ticketState[key];
+                        const githubIssue = issueState[key];
                         return (
                           <Card key={key} className="p-4">
                             <div className="flex items-start justify-between gap-3">
@@ -669,7 +842,14 @@ export default function HomePageClient() {
 
                             {issue.location && <p className="mt-2 text-xs text-[#404040]">Location: {issue.location}</p>}
 
-                            <div className="mt-3 flex items-center gap-2">
+                            {issue.suggestedFix && (
+                              <div className="mt-3 rounded-lg border-2 border-[#0A0A0A] bg-[#F7FAFA] px-3 py-2">
+                                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#404040]">Suggested Fix</p>
+                                <p className="mt-1 text-sm text-[#0A0A0A]">{issue.suggestedFix}</p>
+                              </div>
+                            )}
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
                               {ticket?.url ? (
                                 <a href={ticket.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-cyan-700 underline">
                                   View in Linear →
@@ -684,6 +864,21 @@ export default function HomePageClient() {
                                 </Button>
                               )}
                               {ticket?.error && <span className="text-xs text-red-600">{ticket.error}</span>}
+
+                              {githubIssue?.url ? (
+                                <a href={githubIssue.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-cyan-700 underline">
+                                  View on GitHub →
+                                </a>
+                              ) : (
+                                <Button
+                                  onClick={() => (githubConnected ? createGithubIssue(issue, index) : connectGithub())}
+                                  variant="secondary"
+                                  disabled={githubIssue?.loading}
+                                >
+                                  {githubIssue?.loading ? 'Creating...' : githubConnected ? 'Create GitHub Issue' : 'Connect GitHub to create issue'}
+                                </Button>
+                              )}
+                              {githubIssue?.error && <span className="text-xs text-red-600">{githubIssue.error}</span>}
                             </div>
                           </Card>
                         );
