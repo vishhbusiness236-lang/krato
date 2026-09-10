@@ -1,7 +1,9 @@
 import chromium from '@sparticuz/chromium';
 import { chromium as playwrightChromium } from 'playwright-core';
 
+
 const MAX_PAGES = 5;
+const MAX_ACCESSIBILITY_ISSUES_PER_PAGE = 5;
 
 export type ExplorationStyle = 'happy_path' | 'edge_case' | 'adversarial' | 'security';
 
@@ -261,6 +263,50 @@ async function runSecurityInteractions(page: any): Promise<{ attempts: string[];
   return { attempts, findings };
 }
 
+// ---------- ACCESSIBILITY (WCAG) ----------
+// Runs axe-core (the same engine behind Lighthouse's accessibility audit) against
+// every page scanned, regardless of exploration style. This is a baseline check,
+// not tied to a specific mode — accessibility issues are always worth surfacing.
+
+async function runAccessibilityCheck(page: any, pageUrl: string): Promise<Issue[]> {
+  const issues: Issue[] = [];
+
+  try {
+    const results = await page.evaluate(async () => {
+      // @ts-ignore
+      return await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa'] });
+    });
+
+    console.log(`♿ Accessibility check on ${pageUrl}: found ${results.violations.length} violations`);
+
+    for (const violation of results.violations.slice(0, MAX_ACCESSIBILITY_ISSUES_PER_PAGE)) {
+      const impact = violation.impact;
+      const severity: Issue['severity'] =
+        impact === 'critical' || impact === 'serious' ? 'critical' : impact === 'moderate' ? 'medium' : 'low';
+
+      const affectedCount = violation.nodes.length;
+      const sampleTargets = violation.nodes.slice(0, 2).map((n: any) => n.target.join(' ')).join('; ');
+
+      issues.push({
+        type: `Accessibility: ${violation.help}`,
+        description: `${violation.description} Affects ${affectedCount} element(s) on this page.`,
+        severity,
+        location: pageUrl,
+        evidence: violation.nodes.slice(0, 2).map((n: any) => n.html).join('\n'),
+        reproSteps: [
+          `Visit ${pageUrl}`,
+          sampleTargets ? `Inspect element(s): ${sampleTargets}` : 'Inspect the flagged element(s) with browser DevTools',
+          `Check against WCAG guideline: ${violation.helpUrl}`,
+        ],
+        suggestedFix: `${violation.help}. Reference: ${violation.helpUrl}`,
+      });
+    }
+  } catch (err) {
+    console.error('🔥 Accessibility check failed for', pageUrl, err);
+  }
+
+  return issues;
+}
 function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Issue[] {
   const issues: Issue[] = [];
 
@@ -518,9 +564,20 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     deviceScaleFactor: 2,
   });
 
+  // fetch axe-core script content once, then inject it into every new page via context —
+  // avoids re-fetching from CDN on each page, which was slowing scans down a lot
+  try {
+    const axeScriptRes = await fetch('https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js');
+    const axeScriptContent = await axeScriptRes.text();
+    await context.addInitScript({ content: axeScriptContent });
+  } catch (err) {
+    console.error('🔥 Failed to fetch axe-core script:', err);
+  }
+
   const visited = new Set<string>();
   const toVisit: string[] = [url];
   const pageScans: PageScan[] = [];
+  const accessibilityIssues: Issue[] = [];
   let screenshotBase64 = '';
 
   while (toVisit.length > 0 && pageScans.length < MAX_PAGES) {
@@ -629,6 +686,10 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     }
     // happy_path: no extra interaction, just observe
 
+    // accessibility runs on every page regardless of exploration style — it's a baseline check
+    const pageAccessibilityIssues = await runAccessibilityCheck(page, currentUrl);
+    accessibilityIssues.push(...pageAccessibilityIssues);
+
        if (currentUrl === url) {
       // scroll through the page first to trigger lazy-loaded content before capturing
       await page.evaluate(async () => {
@@ -699,7 +760,7 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     networkErrors: pageScans.flatMap((p) => p.networkErrors),
   };
 
-  const triagedIssues = buildTriagedIssues(pageScans, style);
+  const triagedIssues = [...buildTriagedIssues(pageScans, style), ...accessibilityIssues];
 
   // Journey Discovery (Phase 1: detect-only) — heuristic candidates, then AI groups/orders them
   const journeyCandidates = detectJourneyCandidates(pageScans);
