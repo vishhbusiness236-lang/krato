@@ -709,7 +709,7 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
         });
       });
       await page.waitForTimeout(500);
-      const screenshotBuffer = await page.screenshot({ fullPage: true });
+      const screenshotBuffer = await page.screenshot({ fullPage: true, timeout: 45000 });
       screenshotBase64 = screenshotBuffer.toString('base64');
     }
 
