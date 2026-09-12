@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
-    const { scanData, analysis, screenshotBase64 } = await runScan(url, style || 'happy_path');
+    const { scanData, analysis, screenshotBase64, journeys } = await runScan(url, style || 'happy_path');
 
     const supabase = await createClient();
     const {
@@ -31,6 +31,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // --- Regression diffing (#10/#15): compare against the most recent
+    // prior scan of this same URL by this user, using stable fingerprints ---
+    const { data: previousScan } = await supabase
+      .from('scans')
+      .select('analysis')
+      .eq('url', scanData.url)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let regression: {
+      newIssues: typeof analysis.issues;
+      resolvedIssues: typeof analysis.issues;
+      persistedCount: number;
+    } | null = null;
+
+    if (previousScan?.analysis) {
+      try {
+        const prevAnalysis = JSON.parse(previousScan.analysis);
+        const prevIssues = Array.isArray(prevAnalysis.issues) ? prevAnalysis.issues : [];
+        const currentIssues = analysis.issues || [];
+
+        const prevFingerprints = new Set(prevIssues.map((i: any) => i.fingerprint).filter(Boolean));
+        const currentFingerprints = new Set(currentIssues.map((i) => i.fingerprint).filter(Boolean));
+
+        regression = {
+          newIssues: currentIssues.filter((i) => !prevFingerprints.has(i.fingerprint)),
+          resolvedIssues: prevIssues.filter((i: any) => i.fingerprint && !currentFingerprints.has(i.fingerprint)),
+          persistedCount: currentIssues.filter((i) => prevFingerprints.has(i.fingerprint)).length,
+        };
+      } catch (err) {
+        console.error('Failed to parse previous scan for regression diff:', err);
+      }
+    }
+
     const { data: savedScan, error: dbError } = await supabase
       .from('scans')
       .insert({
@@ -38,11 +74,12 @@ export async function POST(req: NextRequest) {
         scan_data: scanData,
         analysis: JSON.stringify(analysis),
         screenshot: `data:image/png;base64,${screenshotBase64}`,
+        journeys: journeys || [],
         user_id: user.id,
+        regression,
       })
       .select('id')
       .single();
-
     if (dbError) {
       console.error('Failed to save scan — FULL ERROR:', JSON.stringify(dbError, null, 2));
     }
@@ -91,6 +128,8 @@ export async function POST(req: NextRequest) {
       scanData,
       analysis,
       screenshot: `data:image/png;base64,${screenshotBase64}`,
+      journeys: journeys || [],
+      regression,
     });
   } catch (error: any) {
     return NextResponse.json(

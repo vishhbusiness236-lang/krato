@@ -1,5 +1,6 @@
 import chromium from '@sparticuz/chromium';
 import { chromium as playwrightChromium } from 'playwright-core';
+import crypto from 'crypto';
 
 
 const MAX_PAGES = 5;
@@ -18,6 +19,7 @@ export interface Issue {
   reproSteps?: string[];
   evidence?: string;
   suggestedFix?: string;
+  fingerprint: string;
 }
 
 export interface AnalysisResult {
@@ -58,6 +60,24 @@ interface JourneyStepCandidate {
   category: string;
   label: string;
   pageUrl: string;
+}
+
+// ---------- FINGERPRINTING (for regression diffing, #10/#15) ----------
+// A stable ID for a "kind of bug", independent of scan run. Same URL + same
+// issue-type + same normalized detail => same fingerprint across scans, so we
+// can tell "still broken" apart from "new" and "fixed" between two scans of
+// the same site. Keep `extra` short and normalized (no raw error text with
+// timestamps/ids in it) or the fingerprint will drift between runs.
+function makeFingerprint(pageUrl: string, type: string, extra: string = ''): string {
+  let normalizedUrl = pageUrl;
+  try {
+    const parsed = new URL(pageUrl);
+    normalizedUrl = `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    // not a full URL — use as-is
+  }
+  const normalized = `${normalizedUrl}::${type}::${extra}`.toLowerCase().trim();
+  return crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16);
 }
 
 async function getBrowser() {
@@ -299,6 +319,8 @@ async function runAccessibilityCheck(page: any, pageUrl: string): Promise<Issue[
           `Check against WCAG guideline: ${violation.helpUrl}`,
         ],
         suggestedFix: `${violation.help}. Reference: ${violation.helpUrl}`,
+        // axe's own rule id is already stable across runs — perfect fingerprint key
+        fingerprint: makeFingerprint(pageUrl, 'accessibility', violation.id),
       });
     }
   } catch (err) {
@@ -350,6 +372,8 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
           `Observe response: ${err.status}`,
         ],
         suggestedFix,
+        // key on endpoint + method + status, NOT full url (query params can change run-to-run)
+        fingerprint: makeFingerprint(page.url, 'network', `${err.method}::${endpointPath}::${err.status}`),
       });
     }
 
@@ -362,6 +386,8 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
         evidence: errText,
         reproSteps: [`Visit ${page.url}`, 'Open browser DevTools console', 'Error appears on load or interaction'],
         suggestedFix: `Open DevTools on ${page.url} and reproduce this error to get the full stack trace, then trace it back to the source file/line. Common causes: a null/undefined value being accessed before it's ready, or a third-party script failing to load — wrap the risky code in a try/catch or add a null check.`,
+        // truncate + strip anything numeric-ish so line numbers/ids don't break matching across runs
+        fingerprint: makeFingerprint(page.url, 'console', errText.replace(/\d+/g, '#').slice(0, 80)),
       });
     }
 
@@ -393,6 +419,8 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
         evidence: page.interactionAttempts.join('; '),
         reproSteps: page.interactionAttempts,
         suggestedFix: suggestedFixByStyle[style] || suggestedFixByStyle.edge_case,
+        // one per page per style — label + page is a stable enough key here
+        fingerprint: makeFingerprint(page.url, 'exploration', style),
       });
     }
 
@@ -410,6 +438,8 @@ function buildTriagedIssues(pageScans: PageScan[], style: ExplorationStyle): Iss
             'Check page HTML — payload appears unescaped instead of encoded',
           ],
           suggestedFix: `Escape/encode this input before rendering it (use your framework's built-in escaping — e.g. React does this by default unless you're using dangerouslySetInnerHTML). If this is server-rendered, run it through an HTML sanitizer before output. Never render raw user input directly into the DOM.`,
+          // the payload itself is the stable part of "finding"
+          fingerprint: makeFingerprint(page.url, 'unsanitized-input', finding.slice(0, 80)),
         });
       }
     }
@@ -845,18 +875,23 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
   let analysis: AnalysisResult;
   try {
     const parsed = JSON.parse(rawContent);
-    const aiIssues: Issue[] = (Array.isArray(parsed.issues) ? parsed.issues : []).map((issue: Issue) => {
-      const cleanSteps = (issue.reproSteps || []).filter((s) => typeof s === 'string' && s.trim().length > 0);
+    const aiIssues: Issue[] = (Array.isArray(parsed.issues) ? parsed.issues : []).map((issue: any) => {
+      const cleanSteps = (issue.reproSteps || []).filter((s: any) => typeof s === 'string' && s.trim().length > 0);
+      const location = issue.location || url;
       return {
         ...issue,
+        location,
         reproSteps:
           cleanSteps.length > 0
             ? cleanSteps
-            : [`Visit ${issue.location || url}`, `Review: ${issue.description}`, 'Confirm the issue is still present'],
+            : [`Visit ${location}`, `Review: ${issue.description}`, 'Confirm the issue is still present'],
         suggestedFix:
           typeof issue.suggestedFix === 'string' && issue.suggestedFix.trim().length > 0
             ? issue.suggestedFix
             : undefined,
+        // AI issues have no stable id from the model itself, so key on location + type,
+        // which is the closest stable pair we have for this class of issue
+        fingerprint: makeFingerprint(location, 'ai', String(issue.type || '')),
       };
     });
     analysis = {
