@@ -66,7 +66,7 @@ export default function LoginPage() {
           <BrandMark size="lg" className="rounded-2xl" />
           <div>
             <h1 className="text-xl font-semibold">Welcome to Krato</h1>
-            <p className="text-sm text-[#404040]">Sign in to keep your scans private.</p>
+              <p className="text-sm text-[#404040]">Sign in to run your first scan.</p>
           </div>
         </div>
 

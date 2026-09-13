@@ -14,6 +14,16 @@ interface Issue {
   suggestedFix?: string;
 }
 
+interface JourneyStep {
+  label: string;
+  pageUrl: string;
+}
+
+interface Journey {
+  name: string;
+  steps: JourneyStep[];
+}
+
 function severityBadgeTone(severity: string) {
   switch (severity) {
     case 'critical':
@@ -54,7 +64,8 @@ export default async function PublicReportPage({
   }
 
   const scanData = data.scan_data;
-  const issues = analysis.issues || [];
+  const journeys: Journey[] = data.journeys || [];
+  const issues = analysis.issues || [];;
   const sortedIssues = [...issues].sort(
     (a, b) => severityOrder[a.severity] - severityOrder[b.severity]
   );
@@ -113,6 +124,58 @@ export default async function PublicReportPage({
                   <img src={data.screenshot} alt="Scan screenshot" className="w-full h-auto object-contain" />
                 </div>
               </Card>
+            )}
+
+            {journeys.length > 0 && (
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#404040]">Detected User Journeys</h3>
+                <div className="mt-3 space-y-3">
+                  {journeys.map((journey, jIndex) => (
+                    <Card key={`${journey.name}-${jIndex}`} className="min-w-0 p-4">
+                      <p className="text-sm font-semibold">{journey.name}</p>
+                      <div className="mt-3 space-y-2">
+                        {journey.steps.map((step, sIndex) => (
+                          <div key={`${step.label}-${sIndex}`} className="flex min-w-0 items-start gap-2">
+                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-[#0A0A0A] bg-[#F7FAFA] text-[10px] font-semibold">
+                              {sIndex + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="break-words text-sm text-[#0A0A0A]">{step.label}</p>
+                              <p className="break-words text-xs text-[#404040]">{step.pageUrl}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {journeys.length > 0 && (
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#404040]">Detected User Journeys</h3>
+                <div className="mt-3 space-y-3">
+                  {journeys.map((journey, jIndex) => (
+                    <Card key={`${journey.name}-${jIndex}`} className="min-w-0 p-4">
+                      <p className="text-sm font-semibold">{journey.name}</p>
+                      <div className="mt-3 space-y-2">
+                        {journey.steps.map((step, sIndex) => (
+                          <div key={`${step.label}-${sIndex}`} className="flex min-w-0 items-start gap-2">
+                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-[#0A0A0A] bg-[#F7FAFA] text-[10px] font-semibold">
+                              {sIndex + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="break-words text-sm text-[#0A0A0A]">{step.label}</p>
+                              <p className="break-words text-xs text-[#404040]">{step.pageUrl}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             )}
 
             <div className="min-w-0">

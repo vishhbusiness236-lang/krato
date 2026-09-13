@@ -34,6 +34,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script defer src="/api/_z/script.js?id=ZV_Sm1Pvqrskgt9WhuUsFU1XDeE"></script>
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
