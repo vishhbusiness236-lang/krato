@@ -5,6 +5,9 @@ import crypto from 'crypto';
 
 const MAX_PAGES = 5;
 const MAX_ACCESSIBILITY_ISSUES_PER_PAGE = 5;
+// Vercel Hobby kills functions at 60s. Stop starting new pages after this, so the
+// remaining time is left for the Groq calls + response.
+const SCAN_DEADLINE_MS = 22_000;
 
 export type ExplorationStyle = 'happy_path' | 'edge_case' | 'adversarial' | 'security';
 
@@ -565,6 +568,8 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
         temperature: 0.2,
         response_format: { type: 'json_object' },
       }),
+      // don't let a slow Groq call eat the Vercel 60s budget
+      signal: AbortSignal.timeout(5000),
     });
 
     const groqData = await groqResponse.json();
@@ -591,13 +596,15 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
   const browser = await getBrowser();
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
-    deviceScaleFactor: 2,
+    deviceScaleFactor: 1,
   });
 
   // fetch axe-core script content once, then inject it into every new page via context —
   // avoids re-fetching from CDN on each page, which was slowing scans down a lot
   try {
-    const axeScriptRes = await fetch('https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js');
+    const axeScriptRes = await fetch('https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js', {
+      signal: AbortSignal.timeout(5000),
+    });
     const axeScriptContent = await axeScriptRes.text();
     await context.addInitScript({ content: axeScriptContent });
   } catch (err) {
@@ -609,8 +616,13 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
   const pageScans: PageScan[] = [];
   const accessibilityIssues: Issue[] = [];
   let screenshotBase64 = '';
+  const scanStart = Date.now();
 
-  while (toVisit.length > 0 && pageScans.length < MAX_PAGES) {
+  while (
+    toVisit.length > 0 &&
+    pageScans.length < MAX_PAGES &&
+    Date.now() - scanStart < SCAN_DEADLINE_MS
+  ) {
     const currentUrl = toVisit.shift()!;
     if (visited.has(currentUrl)) continue;
     visited.add(currentUrl);
@@ -681,7 +693,7 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     });
 
     try {
-      await page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      await page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
     } catch (err: any) {
       await page.close();
       if (currentUrl === url) {
@@ -720,27 +732,15 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     const pageAccessibilityIssues = await runAccessibilityCheck(page, currentUrl);
     accessibilityIssues.push(...pageAccessibilityIssues);
 
-       if (currentUrl === url) {
-      // scroll through the page first to trigger lazy-loaded content before capturing
-      await page.evaluate(async () => {
-        await new Promise<void>((resolve) => {
-          let totalHeight = 0;
-          const distance = 300;
-          const timer = setInterval(() => {
-            const scrollHeight = document.body.scrollHeight;
-            window.scrollBy(0, distance);
-            totalHeight += distance;
-            if (totalHeight >= scrollHeight) {
-              clearInterval(timer);
-              window.scrollTo(0, 0);
-              resolve();
-            }
-          }, 100);
-        });
-      });
-      await page.waitForTimeout(500);
-      const screenshotBuffer = await page.screenshot({ fullPage: true, timeout: 45000 });
-      screenshotBase64 = screenshotBuffer.toString('base64');
+    // Screenshot: viewport only (not fullPage). A full-page capture on long/animated
+    // pages was the thing eating ~45s and triggering Vercel's 60s timeout.
+    if (currentUrl === url) {
+      try {
+        const screenshotBuffer = await page.screenshot({ fullPage: false, timeout: 10000 });
+        screenshotBase64 = screenshotBuffer.toString('base64');
+      } catch (err) {
+        console.error('Screenshot skipped:', err);
+      }
     }
 
     pageScans.push({
@@ -849,26 +849,35 @@ If nothing stands out beyond the already-reported errors, return an empty issues
 Do not include markdown formatting, code fences, or any text outside the JSON object.
 `;
 
-  const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: 'openai/gpt-oss-20b',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      max_tokens: 4096,
-      response_format: { type: 'json_object' },
-    }),
-  });
+  // Wrapped so a slow/failed Groq call falls back to the triaged issues instead of crashing the scan
+  let groqStatus = 0;
+  let groqData: any = {};
+  try {
+    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-20b',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 4096,
+        response_format: { type: 'json_object' },
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    groqStatus = groqResponse.status;
+    groqData = await groqResponse.json();
+  } catch (err) {
+    console.error('🔥 Groq analysis call failed or timed out:', err);
+  }
 
-  const groqData = await groqResponse.json();
   const rawContent = groqData.choices?.[0]?.message?.content;
 
   if (!rawContent) {
-    console.error('🔥 Groq API did not return content. Status:', groqResponse.status);
+    console.error('🔥 Groq API did not return content. Status:', groqStatus);
     console.error('🔥 Full Groq response:', JSON.stringify(groqData, null, 2));
   }
 
