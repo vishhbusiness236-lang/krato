@@ -295,10 +295,13 @@ async function runAccessibilityCheck(page: any, pageUrl: string): Promise<Issue[
   const issues: Issue[] = [];
 
   try {
-    const results = await page.evaluate(async () => {
-      // @ts-ignore
-      return await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa'] });
-    });
+    const results: any = await Promise.race([
+      page.evaluate(async () => {
+        // @ts-ignore
+        return await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa'] });
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('axe timeout')), 8000)),
+    ]);
 
     console.log(`♿ Accessibility check on ${pageUrl}: found ${results.violations.length} violations`);
 
@@ -736,7 +739,7 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     // pages was the thing eating ~45s and triggering Vercel's 60s timeout.
     if (currentUrl === url) {
       try {
-        const screenshotBuffer = await page.screenshot({ fullPage: false, timeout: 10000 });
+        const screenshotBuffer = await page.screenshot({ animations: 'disabled', timeout: 5000 });
         screenshotBase64 = screenshotBuffer.toString('base64');
       } catch (err) {
         console.error('Screenshot skipped:', err);
