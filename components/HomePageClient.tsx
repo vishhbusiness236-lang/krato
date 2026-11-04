@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Badge, BrandMark, BrowserMockup, Button, Card } from '@/components/ui/design-system';
-
+import ReportFeedback from '@/components/ReportFeedback';
 interface Issue {
   type: string;
   description: string;
@@ -766,7 +766,7 @@ export default function HomePageClient() {
                 </Card>
               )}
 
-              <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+               <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#404040]">Summary</h3>
@@ -839,7 +839,6 @@ export default function HomePageClient() {
                                 </ol>
                               </details>
                             )}
-
                             {issue.location && <p className="mt-2 text-xs text-[#404040]">Location: {issue.location}</p>}
 
                             {issue.suggestedFix && (
@@ -885,6 +884,8 @@ export default function HomePageClient() {
                       })}
                     </div>
                   </div>
+
+                  <ReportFeedback key={result.scanId} scanId={result.scanId} />
                 </div>
                 <div className="space-y-4">
                   <BrowserMockup title="Scan data" url={result.scanData.url} className="bg-[#FAFAF9]">
