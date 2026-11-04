@@ -3,7 +3,7 @@ import { chromium as playwrightChromium } from 'playwright-core';
 import crypto from 'crypto';
 
 
-const MAX_PAGES = 5;
+const MAX_PAGES = 10;
 const MAX_ACCESSIBILITY_ISSUES_PER_PAGE = 5;
 // Vercel Hobby kills functions at 60s. Stop starting new pages after this, so the
 // remaining time is left for the Groq calls + response.
