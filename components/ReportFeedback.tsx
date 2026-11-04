@@ -4,6 +4,21 @@ import { useState } from "react";
 
 type Answer = "yes" | "somewhat" | "no";
 
+const QUESTIONS: Record<Answer, { label: string; placeholder: string }> = {
+  yes: {
+    label: "What was most helpful?",
+    placeholder: "e.g. the suggested fix, the accessibility issues, the summary",
+  },
+  somewhat: {
+    label: "What was missing or unclear?",
+    placeholder: "e.g. a bug it didn't catch, an explanation that was vague",
+  },
+  no: {
+    label: "What was wrong, missing or noisy?",
+    placeholder: "e.g. false alarms, empty report, wrong issues",
+  },
+};
+
 export default function ReportFeedback({ scanId }: { scanId?: string }) {
   const [useful, setUseful] = useState<Answer | null>(null);
   const [comment, setComment] = useState("");
@@ -60,11 +75,12 @@ export default function ReportFeedback({ scanId }: { scanId?: string }) {
       {useful && (
         <>
           <label className="mt-4 block text-sm font-bold">
-            What was missing, wrong or noisy? (optional)
+            {QUESTIONS[useful].label} (optional)
           </label>
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
+            placeholder={QUESTIONS[useful].placeholder}
             rows={3}
             className="mt-1 w-full border-2 border-black p-2"
           />
