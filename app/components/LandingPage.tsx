@@ -133,13 +133,13 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
   const comparisonRows: [string, number, number, number, number, number][] = [
     ['Triaged bug reports', 1, 1, 1, 1, 1],
-    ['Scheduled scan alerts', 1, 0, 0, 1, 0],
+    ['Scheduled scans + webhook alerts', 1, 0, 0, 1, 0],
     ['Ticketing integration', 1, 0, 1, 1, 1],
-    ['Session replay', 1, 0, 1, 1, 0],
+    
     ['Custom exploration styles', 1, 0, 0, 0, 0],
     ['AI fix suggestions', 1, 1, 0, 0, 0],
-    ['GitHub auto-PR', 1, 0, 0, 0, 0],
-    ['Solo-dev flat pricing', 1, 0, 0, 0, 0],
+    ['GitHub issue creation', 1, 0, 0, 0, 0],
+    ['Self-serve, no sales call', 1, 0, 0, 0, 0],
     ['Accessibility checks', 1, 0, 0, 0, 0],
     ['Regression diffing', 1, 0, 0, 0, 0],
     ['Public shareable reports', 1, 0, 0, 0, 0],

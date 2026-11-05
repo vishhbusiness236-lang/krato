@@ -22,7 +22,8 @@ export interface Issue {
   reproSteps?: string[];
   evidence?: string;
   suggestedFix?: string;
-  fingerprint: string;
+    fingerprint: string;
+  source?: string;
 }
 
 export interface AnalysisResult {
@@ -904,6 +905,7 @@ Do not include markdown formatting, code fences, or any text outside the JSON ob
         // AI issues have no stable id from the model itself, so key on location + type,
         // which is the closest stable pair we have for this class of issue
         fingerprint: makeFingerprint(location, 'ai', String(issue.type || '')),
+source: 'ai',
       };
     });
     analysis = {
