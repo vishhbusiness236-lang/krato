@@ -76,12 +76,39 @@ function makeFingerprint(pageUrl: string, type: string, extra: string = ''): str
   let normalizedUrl = pageUrl;
   try {
     const parsed = new URL(pageUrl);
-    normalizedUrl = `${parsed.origin}${parsed.pathname}`;
+      normalizedUrl = `${parsed.origin}${parsed.pathname.replace(/\/+$/, '') || '/'}`;
   } catch {
     // not a full URL — use as-is
   }
   const normalized = `${normalizedUrl}::${type}::${extra}`.toLowerCase().trim();
   return crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16);
+}
+// ---------- URL NORMALIZATION ----------
+// Different spellings of the same page (trailing slash, #fragment, utm params)
+// compare as equal. Use it only as a key for "have I seen this page" checks;
+// navigate to and store the original URL so old scan history keeps matching.
+const TRACKING_PARAMS = /^(utm_|fbclid$|gclid$|msclkid$|mc_cid$|mc_eid$|ref$|ref_src$)/i;
+
+export function normalizeUrl(input: string): string {
+  try {
+    const u = new URL(input);
+    u.hash = '';
+    u.hostname = u.hostname.toLowerCase();
+    if (
+      (u.protocol === 'https:' && u.port === '443') ||
+      (u.protocol === 'http:' && u.port === '80')
+    ) {
+      u.port = '';
+    }
+    for (const key of [...u.searchParams.keys()]) {
+      if (TRACKING_PARAMS.test(key)) u.searchParams.delete(key);
+    }
+    u.searchParams.sort();
+    if (u.pathname.length > 1) u.pathname = u.pathname.replace(/\/+$/, '');
+    return u.toString();
+  } catch {
+    return input;
+  }
 }
 
 async function getBrowser() {
@@ -628,8 +655,9 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
     Date.now() - scanStart < SCAN_DEADLINE_MS
   ) {
     const currentUrl = toVisit.shift()!;
-    if (visited.has(currentUrl)) continue;
-    visited.add(currentUrl);
+    const currentKey = normalizeUrl(currentUrl);
+    if (visited.has(currentKey)) continue;
+    visited.add(currentKey);
 
     const page = await context.newPage();
     const consoleErrors: string[] = [];
@@ -764,10 +792,11 @@ export async function runScan(inputUrl: string, style: ExplorationStyle = 'happy
         try {
           const linkUrl = new URL(link);
           const clean = `${linkUrl.origin}${linkUrl.pathname}`;
+          const cleanKey = normalizeUrl(clean);
           if (
             linkUrl.origin === startOrigin &&
-            !visited.has(clean) &&
-            !toVisit.includes(clean) &&
+            !visited.has(cleanKey) &&
+            !toVisit.some((queued) => normalizeUrl(queued) === cleanKey) &&
             !clean.match(/\.(png|jpg|jpeg|svg|pdf|zip|css|js)$/i)
           ) {
             toVisit.push(clean);
